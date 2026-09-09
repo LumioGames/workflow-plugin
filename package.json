@@ -1,6 +1,6 @@
 {
   "name": "workflow-plugin",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "type": "module",
   "description": "Agent plugin for Workflow (workflow.games) — 技能包与契约测试",

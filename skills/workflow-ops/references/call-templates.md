@@ -160,7 +160,8 @@ curl -sS -X POST "$WORKFLOW_API_BASE/comments" \
 排在证据评论**之后**、状态流转**之前**——`handoffRef` 通常就指向刚写完的那条证据评论。
 
 ```bash
-# agentLabel 必填：服务端不推断，缺失即 422。来源优先级见 connection.md 第一节，绝不猜一个填进去。
+# agentLabel 必填且上限 40 字符：服务端不推断，缺失即 422。来源优先级见 connection.md 第一节，绝不猜一个填进去。
+# handoffRef 上限 500 字符——deepLink 拼出来的长 URL 要先量一量，别指望服务端截断。
 # summary 上限 200 字符（中文按字数算），超了要重写不要截断——被截掉的恰好是最要紧的「文档在哪」。
 curl -sS -X POST "$WORKFLOW_API_BASE/handoffs" \
   -H "Authorization: Bearer $WORKFLOW_TOKEN" \

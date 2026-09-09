@@ -55,7 +55,7 @@ fi
 
 ### 本节附：`agentLabel`（交接纪要必填）
 
-`POST /handoffs` 的 `agentLabel` 标识**是哪个仓库的 Agent** 写的（`client` / `server` / `game` 之类的小写 slug）。多个仓库的 Agent 常由同一个人签发的 PAT 驱动，`createdBy` 分不出来，所以服务端不推断、不猜测，**缺失即 422**。解析优先级：
+`POST /handoffs` 的 `agentLabel` 标识**是哪个仓库的 Agent** 写的（`client` / `server` / `game` 之类的小写 slug，上限 40 字符）。多个仓库的 Agent 常由同一个人签发的 PAT 驱动，`createdBy` 分不出来，所以服务端不推断、不猜测，**缺失即 422**。解析优先级：
 
 1. 环境变量 `WORKFLOW_AGENT_LABEL`（CI 与一次性覆盖，最高优先）。
 2. `.workflow` 的 `[agent].label`：

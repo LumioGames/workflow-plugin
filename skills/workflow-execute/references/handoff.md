@@ -50,9 +50,9 @@
 ```
 
 - **超 200 字符要重写，不要截断**——被截掉的恰好是最要紧的「交接文档在哪」。压不下来就砍第一行的细节，不砍第三行。
-- `handoffRef` 是独立字段，优先填刚写的那条证据评论的深链；`summary` 第三行写人读得懂的落点名，两者不冲突。
+- `handoffRef` 是独立字段（上限 500 字符），优先填刚写的那条证据评论的深链；`summary` 第三行写人读得懂的落点名，两者不冲突。
 - 纯文本：不写 Markdown 结构、不贴命令输出、**不写 token / 凭据 / 个人数据**（G4）。绑了飞书群的需求室会把纪要镜像进群，读者比单据本身多一圈。
-- `agentLabel` 标明**是哪个仓库的 Agent** 写的（`client` / `server` / `game` 之类的小写 slug，同一仓库内保持稳定），**必填且不猜**：按 [connection.md](../../workflow-ops/references/connection.md) 第一节的优先级取，都拿不到就在 [execute-flow.md](execute-flow.md) 第四节梳理时问用户一次，并把答案记进决策记录。它只是来源标签，不参与鉴权、不构成身份。
+- `agentLabel` 标明**是哪个仓库的 Agent** 写的（`client` / `server` / `game` 之类的小写 slug，上限 40 字符，同一仓库内保持稳定），**必填且不猜**：按 [connection.md](../../workflow-ops/references/connection.md) 第一节的优先级取，都拿不到就在 [execute-flow.md](execute-flow.md) 第四节梳理时问用户一次，并把答案记进决策记录。它只是来源标签，不参与鉴权、不构成身份。
 
 ## 三、模式二（无凭证）的交回报告
 

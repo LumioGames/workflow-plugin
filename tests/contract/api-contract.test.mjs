@@ -41,13 +41,6 @@ const formalRequirementReferencePaths = new Set([
   // $WORKFLOW_API_BASE 已经包含 /api/v1，模板中的运行时路径不重复该前缀。
   "/requirements/{}/references/{}",
   "/requirement-graph",
-  // 交接纪要（0.9.0）：平台侧合同已定稿并进 docs/api/guides/handoffs.md，但公开的
-  // openapi/gameflow.v1.yaml 要等那一版后端上线才同步。技能先教、上线后这几行连同
-  // 下面的 diagnostic 一起删掉；在此之前它们只降级成提示，不掩盖任何**未知**路径。
-  "/api/v1/handoffs",
-  "/api/v1/rooms/{}/handoffs",
-  "/handoffs",
-  "/rooms/{}/handoffs",
 ]);
 
 async function fetchText(url) {
@@ -196,7 +189,7 @@ describe("L2 合同一致性", () => {
 
   test("合同里带 maxLength 的字段，技能必须写明该约束", (t) => {
     if (offlineReason) return t.skip(offlineReason);
-    for (const schema of ["CreateRoomRequest", "SupportTicketRequest"]) {
+    for (const schema of ["CreateRoomRequest", "SupportTicketRequest", "CreateHandoffRequest"]) {
       const limits = schemaMaxLengths(yaml, schema);
       assert.ok(Object.keys(limits).length > 0, `${schema} 不再声明 maxLength？确认合同变更`);
       for (const [field, limit] of Object.entries(limits)) {

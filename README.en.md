@@ -6,7 +6,7 @@
 
 **Connect Claude Code, Cursor, and Codex to [Workflow](https://workflow.games) — requirements, bugs, tasks, status transitions, and live QA, all driven by your coding agent.**
 
-![version](https://img.shields.io/badge/version-0.9.0-2ea44f) ![skills](https://img.shields.io/badge/skills-10-blue) ![spec](https://img.shields.io/badge/Agent%20Plugins-1.0.0-8b5cf6) ![API](https://img.shields.io/badge/API-OpenAPI%20contract%20as%20truth-orange) ![write](https://img.shields.io/badge/writes-read--back%20verified-red)
+![version](https://img.shields.io/badge/version-0.9.1-2ea44f) ![skills](https://img.shields.io/badge/skills-10-blue) ![spec](https://img.shields.io/badge/Agent%20Plugins-1.0.0-8b5cf6) ![API](https://img.shields.io/badge/API-OpenAPI%20contract%20as%20truth-orange) ![write](https://img.shields.io/badge/writes-read--back%20verified-red)
 
 [简体中文](./README.md) · **English**
 
