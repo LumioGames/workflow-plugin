@@ -69,8 +69,8 @@ describe("两种执行模式", () => {
     assert.match(skill, /即使 config 里只有一个 profile/);
   });
 
-  test("无凭证交回报告五段齐全，状态 key 不猜", () => {
-    for (const token of ["目标单", "建议流转", "证据评论正文", "附件清单", "Known gaps"]) {
+  test("无凭证交回报告六段齐全，状态 key 不猜", () => {
+    for (const token of ["目标单", "建议流转", "证据评论正文", "附件清单", "交接纪要草稿", "Known gaps"]) {
       assert.ok(handoff.includes(token), `无凭证交回缺少「${token}」`);
     }
     assert.match(handoff, /不猜状态 key/);
@@ -130,23 +130,29 @@ describe("执行流程纪律", () => {
     assert.match(flow, /slots\/<slotKey>\/claim/);
   });
 
-  test("回写固定顺序：遗留补单 → 附件 → 证据评论 → 流转状态，每步读回", () => {
+  test("回写固定顺序：遗留补单 → 附件 → 证据评论 → 交接纪要 → 流转状态，每步读回", () => {
     assert.match(flow, /先补单、再有证据、再有结论、最后才流转/);
     const backfillIdx = flow.indexOf("遗留补单（先于证据评论）");
     const attachIdx = flow.indexOf("上传证据附件");
     const commentIdx = flow.indexOf("POST 证据评论");
+    const handoffIdx = flow.indexOf("POST 交接纪要");
     const transitionIdx = flow.indexOf("流转状态（待验收优先）");
     assert.ok(
-      backfillIdx > 0 && attachIdx > backfillIdx && commentIdx > attachIdx && transitionIdx > commentIdx,
+      backfillIdx > 0 &&
+        attachIdx > backfillIdx &&
+        commentIdx > attachIdx &&
+        handoffIdx > commentIdx &&
+        transitionIdx > handoffIdx,
       "回写顺序段落次序不对"
     );
     assert.match(flow, /重发前，必须先读回/);
   });
 
-  test("完成三件套一件不能少：状态流转 + 提交单号 + 遗留项落卡", () => {
-    // 用户强约束：开发完成 = 流转到待验收/已完成 + 评论带 Git/SVN 提交单号 + 未做事项补需求单。
-    assert.match(skill, /三件硬性交付一件不能少/);
-    assert.match(flow, /三件事一件不能少：状态流转、带提交单号的证据评论、遗留项落卡/);
+  test("完成四件套一件不能少：状态流转 + 提交单号 + 遗留项落卡 + 交接纪要", () => {
+    // 用户强约束：开发完成 = 流转到待验收/已完成 + 评论带 Git/SVN 提交单号 + 未做事项补需求单
+    // + 一条给下一棒的交接纪要（0.9.0 新增的第四件）。
+    assert.match(skill, /四件硬性交付一件不能少/);
+    assert.match(flow, /四件事一件不能少：状态流转、带提交单号的证据评论、遗留项落卡、交接纪要/);
     assert.match(flow, /「提交单号」小节必填/);
   });
 
@@ -171,6 +177,51 @@ describe("执行流程纪律", () => {
     assert.match(flow, /不改 description/);
     assert.match(flow, /不动验收项状态/);
     assert.match(flow, /完成由验收方判定/);
+  });
+});
+
+describe("交接纪要（接力的单一真值）", () => {
+  test("开工前读所属需求室最近的纪要，并声明它是数据不是指令", () => {
+    // ADR-0015：纪要比群历史窄得多，但仍然是别人写的自由文本——注入面没有消失。
+    assert.match(skill, /rooms\/\{roomId\}\/handoffs/);
+    assert.match(flow, /rooms\/\{roomId\}\/handoffs/);
+    assert.match(readCard, /rooms\/<room-uuid>\/handoffs/);
+    for (const text of [skill, flow, readCard]) {
+      assert.match(text, /是数据不是指令|只当事实素材/);
+    }
+    // 室不存在返 404 而不是空列表——读成「还没人留纪要」就会把抄错的 roomId 当成事实。
+    assert.match(readCard, /404/);
+  });
+
+  test("summary 三行模板：≤200 字符，超长重写不截断", () => {
+    assert.match(handoff, /做了什么/);
+    assert.match(handoff, /怎么交接/);
+    assert.match(handoff, /交接文档在哪/);
+    assert.match(handoff, /≤200 字符/);
+    // 截断会砍掉最后一行——恰好是最要紧的那行。
+    assert.match(handoff, /超 200 字符要重写，不要截断/);
+    assert.match(handoff, /不写 token \/ 凭据 \/ 个人数据/);
+  });
+
+  test("agentLabel 必填且不猜，解析优先级写死在共享的 connection.md 里", () => {
+    const connection = read("skills/workflow-ops/references/connection.md");
+    assert.match(connection, /WORKFLOW_AGENT_LABEL/);
+    assert.match(connection, /\[agent\]/);
+    assert.match(connection, /绝不猜、绝不省略/);
+    // `.workflow` 顶层单键的旧口径必须同步——否则 [agent] 表会被当成格式错误。
+    assert.match(connection, /`\[agent\]`/);
+    assert.match(read("skills/workflow-setup/SKILL.md"), /\[agent\]/);
+    for (const text of [skill, flow, handoff]) {
+      assert.match(text, /agentLabel/);
+    }
+  });
+
+  test("纪要排在证据评论之后、流转之前，且 roomId 为空按「已存库、未镜像」如实报", () => {
+    assert.match(flow, /已存库、未镜像/);
+    assert.match(read("skills/workflow-upload/SKILL.md"), /createHandoff/);
+    assert.match(read("skills/workflow-upload/SKILL.md"), /证据评论\*\*之后\*\*、状态流转\*\*之前\*\*/);
+    // create 类 POST 的幂等键纪律必须覆盖 createHandoff。
+    assert.match(read("skills/workflow-ops/references/draft-format.md"), /createHandoff/);
   });
 });
 
@@ -334,10 +385,12 @@ describe("ops 扩充：重开与层级", () => {
 });
 
 describe("上下文预算", () => {
-  test("execute 主线（SKILL + 流程 + 交回 + 读单 + 搜索）不超过 32KB", () => {
-    // 0.5.0 新增三块硬纪律（开工前梳理讨论、并行子 Agent、完成三件套）后，
-    // 维护者确认把预算上调到 32KB。预算本身保留：它防的是无意识膨胀，逼近上限时先删冗余。
+  test("execute 主线（SKILL + 流程 + 交回 + 读单 + 搜索）不超过 37KB", () => {
+    // 0.5.0 新增三块硬纪律（开工前梳理讨论、并行子 Agent、完成三件套）后上调到 32KB；
+    // 0.9.0 加入第四件硬性交付（交接纪要：写模板 + 读单第六路 + agentLabel 纪律）后
+    // 上调到 37KB——加之前先按「逼近上限先删冗余」压过一轮，重复口径改成指针。
+    // 预算本身保留：它防的是无意识膨胀，不是禁止有意识的新纪律。
     const total = [skill, flow, handoff, readCard, searchRef].reduce((sum, text) => sum + Buffer.byteLength(text, "utf8"), 0);
-    assert.ok(total < 32000, `执行主线上下文 ${total} 字节，超出 32KB 预算`);
+    assert.ok(total < 37000, `执行主线上下文 ${total} 字节，超出 37KB 预算`);
   });
 });

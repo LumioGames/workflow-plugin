@@ -29,7 +29,7 @@ curl -sS -H "Authorization: Bearer $WORKFLOW_TOKEN" "$WORKFLOW_API_BASE/projects
 一台机器接多个项目时，插件全局只装一份、`config.toml` 每项目一节 profile，项目目录用 `.workflow` 标记文件声明「这个目录绑哪个 profile」：
 
 - **位置**：项目仓库根（或当前工作目录）。查找规则：从当前目录向上逐级找，取最近的一个，到含 `.git` 的目录或文件系统根为止。
-- **内容**：一行 TOML——`profile = "<profile 名>"`（双引号）；允许**整行** `#` 注释（不支持行内注释，会导致解析落空）。**顶层仅此一键**；另可有一个可选的 `[qa]` 表供 workflow-qa 读取受测线上地址与凭据的**环境变量名**（见下）。整个文件**不含 token 也不含任何凭据**，可提交进版本库与全队共享（每人的 token 仍在各自全局 config 里）。
+- **内容**：一行 TOML——`profile = "<profile 名>"`（双引号）；允许**整行** `#` 注释（不支持行内注释，会导致解析落空）。**顶层仅此一键**；另可有两个可选表：`[qa]` 供 workflow-qa 读取受测线上地址与凭据的**环境变量名**，`[agent]` 声明这个仓库的 Agent 标签（都见下）。整个文件**不含 token 也不含任何凭据**，可提交进版本库与全队共享（每人的 token 仍在各自全局 config 里）。
 - **写入时机**：setup 完成项目绑定时问用户「要不要把绑定写进当前项目（`.workflow` 文件）」，默认写。
 - **解析落空 = 停止，不回落**：`.workflow` 存在但读不出 profile 名（写了行内注释、用了单引号、键名拼错）时，**必须停下让用户修**，绝不悄悄改用全局 `current_profile`——那正好会把数据写进另一个项目，是这套绑定机制要防的唯一一件事。
 
@@ -48,7 +48,18 @@ surfaces = ["web"]
 
 **只写环境变量名，绝不写用户名或密码本身**——这个文件是要提交进版本库的。字段口径以 workflow-qa 的 `references/qa-environment.md` 为准。
 
-`.workflow` 是独立文件，**绝不合并进 `config.toml`**——`config.toml` 的格式合同一个键都不能加（见分支 C 的写盘规则），`[qa]` 只属于 `.workflow`。
+可选的 `[agent]` 表（多个仓库的 Agent 往同一个 Workflow 项目里做单时建议配）：
+
+```toml
+profile = "<profile 名>"
+
+[agent]
+label = "client"
+```
+
+`label` 就是交接纪要 `POST /handoffs` 的 `agentLabel`，标明**是哪个仓库的 Agent** 写的（`client` / `server` / `game` 之类的小写 slug，同一仓库内保持稳定）。它是展示用的来源标签，**不参与鉴权、不构成身份**，也不是凭据——正因如此才适合随文件提交给全队。解析优先级 env `WORKFLOW_AGENT_LABEL` → `[agent].label` → 都没有就在用到时问用户一次（口径见 [workflow-ops/references/connection.md](../workflow-ops/references/connection.md) 第一节）。setup 写 `.workflow` 时顺带问一句要不要写死这个标签，用户说不用就不写。
+
+`.workflow` 是独立文件，**绝不合并进 `config.toml`**——`config.toml` 的格式合同一个键都不能加（见分支 C 的写盘规则），`[qa]` 与 `[agent]` 只属于 `.workflow`。
 
 ## 权限模式策略
 
@@ -111,7 +122,7 @@ EOF
 - 文件已存在时**合并**：保留已有 profile，只新增/更新目标 profile，不整文件覆盖。
 - profile 名默认用子域前缀。
 
-**写完 config.toml，接着写 `.workflow` 绑定**：问用户「要不要把绑定写进当前项目（`.workflow` 文件）」，默认写——在项目仓库根写入一行 `profile = "<profile 名>"`（规范见「项目绑定与多项目」），然后进入验证。
+**写完 config.toml，接着写 `.workflow` 绑定**：问用户「要不要把绑定写进当前项目（`.workflow` 文件）」，默认写——在项目仓库根写入一行 `profile = "<profile 名>"`（规范见「项目绑定与多项目」）；同时问一句要不要写上 `[agent].label`（这个仓库的 Agent 标签，交接纪要要用），不写也不影响连接。然后进入验证。
 
 ## 验证与分诊
 

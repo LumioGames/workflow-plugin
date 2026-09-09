@@ -26,7 +26,11 @@ description: 将 Workflow 本地草稿按权限模式、全局查重、依赖拓
 6. 解析真实 UUID/displayKey/deepLink 后创建验收项、评论和附件；不同目标之间可并发，最后
    通过 Provider 写入直接边。Requirement direct edge 调用原生
    `bindRequirementReference`，再用 `getRequirementGraph` 读回；图谱中的引用边是无向的，
-   依赖方向仍以 manifest 的 upstream/downstream 为准。
+   依赖方向仍以 manifest 的 upstream/downstream 为准。同一目标上的交接纪要
+   （`createHandoff`）排在其证据评论**之后**、状态流转**之前**：`handoffRef` 要指向刚落库
+   的那条评论，而先留纪要再流转才不会出现「已流转但没有交接落点」的窗口。纪要响应
+   `roomId` 为空按「已存库、未镜像」如实报，不算失败；`mirrored=true` 只是「会去投」，不是
+   送达回执，不得据此声称已通知到人。
 7. 每个写操作后立即 GET 读回，更新 checkpoint 和 events.ndjson。全部操作结束后无条件做全量数量对账：相关列表翻页到 `nextCursor` 为空，本批标题各恰好 1 条且条数 == 预期，出现标题重复即失败——不得只核对「你以为建的那张」。完整完成才清理 bundle。
 
 ## 受控并发上传（默认开启）
@@ -37,7 +41,7 @@ description: 将 Workflow 本地草稿按权限模式、全局查重、依赖拓
 - manifest 可在 `upload.concurrency` 指定并发度；缺失时默认为 `4`，允许范围 `1–8`，超出范围
   停止并报告。`1` 仅用于平台临时限流或用户明确要求串行。
 - 每个 worker 一次只处理一个 `opId`。调度器只派发 `pending` 且所有 `dependsOn` 已 `verified` 的
-  操作；同一资源的 PATCH、附件和评论按资源锁串行，互不相关的资源可同时进行。
+  操作；同一资源的 PATCH、附件、评论和交接纪要按资源锁串行，互不相关的资源可同时进行。
 - Requirement 引用操作按“引用关系组”归并资源锁；同一无序 UUID 对的 bind/unbind 不能并发，
   不同 UUID 对可以并发。`manual` 只确认关系组，不逐边询问。
 - 创建节点必须先完成并读回，再释放其子资源；关系操作必须等待两端 UUID 都已读回。一个 wave

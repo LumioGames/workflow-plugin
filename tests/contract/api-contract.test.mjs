@@ -41,6 +41,13 @@ const formalRequirementReferencePaths = new Set([
   // $WORKFLOW_API_BASE 已经包含 /api/v1，模板中的运行时路径不重复该前缀。
   "/requirements/{}/references/{}",
   "/requirement-graph",
+  // 交接纪要（0.9.0）：平台侧合同已定稿并进 docs/api/guides/handoffs.md，但公开的
+  // openapi/gameflow.v1.yaml 要等那一版后端上线才同步。技能先教、上线后这几行连同
+  // 下面的 diagnostic 一起删掉；在此之前它们只降级成提示，不掩盖任何**未知**路径。
+  "/api/v1/handoffs",
+  "/api/v1/rooms/{}/handoffs",
+  "/handoffs",
+  "/rooms/{}/handoffs",
 ]);
 
 async function fetchText(url) {
@@ -140,7 +147,7 @@ describe("L2 合同一致性", () => {
           missing.push(`${file.path} → ${path}`);
         }
         if (!known.has(path) && formalRequirementReferencePaths.has(path) && !supplementalDiagnostics.has(path)) {
-          t.diagnostic(`${path} 已由正式 Requirement 引用提示词确认，但线上 OpenAPI 尚未同步`);
+          t.diagnostic(`${path} 已由平台侧正式合同确认，但线上 OpenAPI 尚未同步`);
           supplementalDiagnostics.add(path);
         }
       }
