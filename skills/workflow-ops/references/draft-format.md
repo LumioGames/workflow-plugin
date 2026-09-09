@@ -63,7 +63,7 @@ ops/execute 写回节点可以省略 `readiness`，按操作自身状态和依�
 `pending | in_flight | succeeded | verified | failed | blocked`。
 
 建单类 POST（`createRequirement` / `createWorkItem` / `createRoom` / `createComment` /
-`createAttachment` / `createAcceptanceItem` / `createMilestone` / `createRelation`）的
+`createAttachment` / `createHandoff` / `createAcceptanceItem` / `createMilestone` / `createRelation`）的
 `idempotencyKey` **发出前必须已经写入 manifest** 并落盘，断点续传复用同一个值。键用 RFC 4122
 UUID v5：namespace = `uuid.NAMESPACE_URL`，name = `bundleId + ":" + opId`（用 `opId` 而不是只拿
 `localId`——一张卡可以有多条 create 类 POST）。禁止在发送时现场 `$(uuidgen)`：重试会换新键，等于关掉服务端幂等。create 类 POST 缺 `idempotencyKey` 不得发出；上传器对缺字段的 create 直接标 `blocked`，不发请求。

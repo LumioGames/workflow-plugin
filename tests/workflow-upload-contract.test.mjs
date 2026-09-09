@@ -40,7 +40,7 @@ describe("Workflow bundle 上传合同", () => {
 
   test("并发调度遵守 DAG、资源锁和关系 UUID 前置", () => {
     assert.match(skill, /`dependsOn` 已 `verified`/);
-    assert.match(skill, /同一资源的 PATCH、附件和评论按资源锁串行/);
+    assert.match(skill, /同一资源的 PATCH、附件、评论和交接纪要按资源锁串行/);
     assert.match(skill, /关系操作必须等待两端 UUID 都已读回/);
     assert.match(calls, /topologicalWaves/);
     assert.match(calls, /targetType \+ targetId.*资源锁/);
