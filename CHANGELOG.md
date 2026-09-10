@@ -2,6 +2,12 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.2]
+
+常驻硬规则把第一性原则从一句扩成完整推演框架：解构表象、锚定项目知识库（`.spec/knowledge/`）事实与可复用资产、根源推演；复用优先于新建，并强制输出思考链。
+
+- `rules/system.md` 工程节写入 Role / Execution Logic / Constraints / Output Format；项目知识库指向 `.spec/knowledge/`（入口 `README.md`）。
+
 ## [1.3.1]
 
 常驻硬规则补上第一性原则：剥离表象与经验，将事物拆解为最基本的客观事实，再从根源重新推导出最优解，如无必要，勿增实体。
