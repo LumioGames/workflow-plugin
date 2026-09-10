@@ -2,6 +2,14 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.6]
+
+`/workflow:init` 是装好插件后每个项目的唯一步骤：先搭 `.spec` 骨架，再立刻接入 Workflow。独立的 `/workflow:setup` 与 `workflow-setup` 技能已去掉。
+
+- 新增 `workflow-init`：阶段 1 跑 `init-scaffold`（不写 token、默认不覆盖已有文件）；阶段 2 执行原 setup 的连接流程（注册 / token / `config.toml` / `.workflow` / `/me` + `/projects/current`）。已连通则只报告身份。
+- 删除 `plugin/commands/setup.md` 与 `plugin/skills/workflow-setup/`。连接或 401/403 一律转 `workflow-init`。
+- 脚手架脚本仍不写凭据；token 仍由用户在自己终端写盘，不进会话。
+
 ## [1.3.5]
 
 仓根宿主入口改为 `CLAUDE.md` 与 `AGENTS.md` 都必须有：Claude 读前者，Codex 与其它宿主读后者。两份都是指向同一组三份项目文件的薄指针。

@@ -16,7 +16,7 @@ description: 把模糊想法、长文、附件或讨论结果澄清为可执行�
 <!-- gates:start -->
 | # | 触发条件 | 动作 |
 | :-: | --- | --- |
-| **G1** | `project.subdomainPrefix`、实际 API Host、`.workflow` 所选 profile 的子域三者任一不一致；或 `publicDemo=true`；或 `.workflow` 存在却解析不出 profile | **停止**，转 workflow-setup 重新绑定。绝不把数据写进错误项目 |
+| **G1** | `project.subdomainPrefix`、实际 API Host、`.workflow` 所选 profile 的子域三者任一不一致；或 `publicDemo=true`；或 `.workflow` 存在却解析不出 profile | **停止**，转 workflow-init 重新绑定。绝不把数据写进错误项目 |
 | **G2** | 用户尚未针对**确切的项目 + 对象清单 + 数量**给出明确肯定答复，且当前模式没有有效的用户级 `full` standing authorization | **不得** POST/PATCH。内容认可、说"不错"、说"继续"都不是写入授权；`full` 也只覆盖已校验的 manifest；范围一变授权即失效 |
 | **G3** | 写操作之后没有 `GET` 读回，或读回未核对字段与子资源数量；批量建单后未翻页对账本批标题各恰好 1 条且条数 == 预期；只核自称创建的那张不算过闸 | **不得**声称「已创建 / 已修改」。部分成功如实报部分成功 |
 | **G4** | 需要在命令、日志、报告、蓝图里出现 token | **只**走环境变量携带；任何输出里只以 `wfp_` + 前 8 位指代，绝不回显完整值 |
@@ -43,7 +43,7 @@ description: 把模糊想法、长文、附件或讨论结果澄清为可执行�
 - `.workflow-drafts/<bundleId>/manifest.json` 只记录本批次，不是项目级依赖数据库，也不作为附件上传；增量 bundle 不修改历史 bundle。
 - 用户只要求方案、PRD、拆解或提示词时，展示蓝图后停止，不诱导落单。
 - 落单只处理 bundle 中获授权的 PM 对象；专业 Requirement 正式开工时，再按目标仓库的开发流程拆 WorkItem。
-- 本技能**不用于字段已明确的单次建单**、查询、改单、流转、评论或附件操作——这些转 `workflow-ops`（同样先生成本地 bundle，字段与边界由它负责）；执行者拿单开工与交付回写转 `workflow-execute`；连接或权限问题转 `workflow-setup`。
+- 本技能**不用于字段已明确的单次建单**、查询、改单、流转、评论或附件操作——这些转 `workflow-ops`（同样先生成本地 bundle，字段与边界由它负责）；执行者拿单开工与交付回写转 `workflow-execute`；连接或权限问题转 `workflow-init`。
 
 ## 1. 建立来源与项目上下文
 

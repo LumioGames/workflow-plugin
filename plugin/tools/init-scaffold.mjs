@@ -5,7 +5,7 @@
  * 生成的只有「这个项目是什么、定过什么」那一半(插件出方法、项目出事实的分工):.spec/AGENTS.md、rules/system.md(空模板)、
  * knowledge/README.md + features/_TEMPLATE.md、decisions/README.md、tools/lint-extensions.mjs(样例)、
  * 根 CLAUDE.md 与 AGENTS.md。
- * 不生成 tasks/、plans/(任务真值只有 Workflow),不写 .workflow、不生成 token(项目绑定走 /workflow:setup)。
+ * 不生成 tasks/、plans/(任务真值只有 Workflow),不写 .workflow、不生成 token(接入由 workflow-init 阶段 2 处理)。
  *
  * 确定性优先于灵活:默认**不覆盖**任何已存在文件(--force 才覆盖);CLAUDE.md 已存在时只补缺失的 @import 行,
  * AGENTS.md 已存在时原样跳过;可反复跑(升级插件后再跑一次补齐新增模板)。
@@ -27,9 +27,9 @@ export const AGENTS_MD = `Codex 须主动 Read 这三份。
 ${IMPORT_LINES.join('\n')}
 `
 
-/** .workflow 只含 profile 名、不含 token;本脚本不写它,由 /workflow:setup 在用户确认后写入。 */
+/** .workflow 只含 profile 名、不含 token;本脚本不写它,由 workflow-init 阶段 2 在用户确认后写入。 */
 export const WORKFLOW_NOTE =
-  '项目绑定:本脚本不写 .workflow、不生成 token。要把这个目录绑到某个 Workflow 项目,跑 /workflow:setup——它只写一行 profile = "<名>"(不含凭据,可入库)。'
+  '项目绑定:本脚本不写 .workflow、不生成 token。凭据与 .workflow 由 workflow-init 的接入阶段处理——只写一行 profile = "<名>"(不含凭据,可入库)。'
 
 function walkFiles(dir, base = dir) {
   const out = []

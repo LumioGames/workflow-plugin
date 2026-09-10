@@ -38,9 +38,9 @@
 
 **The Workflow Agent Plugin connects AI coding agents — Claude Code, Cursor, and Codex — directly to [Workflow](https://workflow.games) (workflow.games), a project management platform for game development teams.** Once installed, the agent turns a one-line request into an executable delivery blueprint and files it, reports bugs with automatic deduplication, runs QA against your real production environment, and moves ticket status based on the verdict — and **every write must be verified by reading it back** before the agent is allowed to claim success.
 
-The plugin ships 16 skills, 13 slash commands, and 21 hard gates (G1–G7 for writes, Q1–Q7 for QA, F1–F7 for feedback). Planning and write-backs first land in `.workflow-drafts/<bundleId>/`; dependency analysis and bounded concurrent upload are handled by dedicated skills with per-operation read-back. Automated tests treat the live OpenAPI contract as the source of truth and re-check for contract drift weekly. It follows the [Agent Plugins 1.0.0](https://agent-plugins.org/) specification, is also installable as a Claude Code marketplace plugin, and is MIT licensed.
+The plugin ships 16 skills, 12 slash commands, and 21 hard gates (G1–G7 for writes, Q1–Q7 for QA, F1–F7 for feedback). Planning and write-backs first land in `.workflow-drafts/<bundleId>/`; dependency analysis and bounded concurrent upload are handled by dedicated skills with per-operation read-back. Automated tests treat the live OpenAPI contract as the source of truth and re-check for contract drift weekly. It follows the [Agent Plugins 1.0.0](https://agent-plugins.org/) specification, is also installable as a Claude Code marketplace plugin, and is MIT licensed.
 
-**As of 1.0.0 it also covers how the work itself gets done**: every session starts by injecting the shared rules and pulling your live tickets into a local index, and the package now carries five method skills (brainstorming, TDD, debugging, knowledge upkeep, receiving review) plus a read-only reviewer subagent, a project structure lint (`/workflow:lint`), and a scaffolder (`/workflow:init`).
+**As of 1.0.0 it also covers how the work itself gets done**: every session starts by injecting the shared rules and pulling your live tickets into a local index, and the package now carries five method skills (brainstorming, TDD, debugging, knowledge upkeep, receiving review) plus a read-only reviewer subagent, a project structure lint (`/workflow:lint`), and project initialization (`/workflow:init`).
 
 ---
 
@@ -60,7 +60,7 @@ This plugin exists for all three. **It is not an "let the AI call the API" switc
 
 | Skill | What it does |
 | :-- | :-- |
-| `workflow-setup` | Onboarding: registration walkthrough, API token creation, config write, connection verification, on-the-spot 401/403 triage |
+| `workflow-init` | Required once per project: scaffold `.spec` and root pointers, then connect to Workflow (registration, token, verification). Safe to re-run — existing files stay; if already connected, it just reports who you are |
 | `workflow-planning` | **Turns one sentence into an executable delivery blueprint** — decides single requirement vs. requirement room, splits delivery tracks, schedules parallel waves, writes acceptance criteria |
 | `workflow-ops` | Execution: create requirements / rooms / milestones, file bugs (with dedup), query tasks, assign, transition, reopen, comment, attach, write handoff notes |
 | `workflow-execute` | **Claims and delivers a ticket end to end** — finds tickets assigned to you, reads them fully (including the latest handoff notes in the owning requirement room), surfaces decision points for discussion before transitioning to in-progress, parallelizes work across sub-agents, and on completion writes evidence back in a uniform template, leaves a handoff note, then moves to review. Supports credential-less execution with a dispatcher writing back. |
@@ -103,7 +103,7 @@ Once installed, **every session start** (launch, resume, `/clear`, post-compacti
 - **Only one line of counts enters the context** (path, item count, per-room counts, how long ago it refreshed). The body never does: when the agent needs a ticket key it greps that file itself, so a board with thousands of tickets costs you nothing in context budget;
 - **The index is for finding ticket keys and rooms; status comes from the server** — always fetch transitions live, never act on the `status` cached in the index.
 
-To refresh immediately (say, right after filing a batch), run `/workflow:index` — it ignores the 15-minute window. With no `.workflow` marker in the current directory it fetches nothing and says nothing; run `/workflow:setup` to bind the project first.
+To refresh immediately (say, right after filing a batch), run `/workflow:index` — it ignores the 15-minute window. With no `.workflow` marker in the current directory it fetches nothing and says nothing; run `/workflow:init` to bind the project first.
 
 ### Structure lint and scaffolding
 
@@ -113,7 +113,7 @@ To refresh immediately (say, right after filing a batch), run `/workflow:index` 
 2. **Project extension** — the optional `.spec/tools/lint-extensions.mjs`, loaded when it exports `api = 1` (a version mismatch is an **error**, never a silent skip). This is where a project adds its own checks;
 3. **Fingerprint** — if the project's `AGENTS.md` or `rules/` contains one of the plugin's reserved headings, or three consecutive lines identical to the plugin's rules, it reports "project copied the plugin." The shared rules are injected every session; a second copy only drifts.
 
-**`/workflow:init` — required once in every project after install.** Only "what this project is and what it has decided": `.spec/AGENTS.md`, `.spec/rules/system.md` (an empty template for project-only red lines), `.spec/knowledge/README.md` and the feature-doc template, `.spec/decisions/README.md`, a sample `.spec/tools/lint-extensions.mjs`, and thin root `CLAUDE.md` + `AGENTS.md` pointers at those three files (Claude reads the former; Codex and other hosts read the latter). It never overwrites existing files by default, so re-running it after a plugin upgrade just fills in new templates. It does **not** write `.workflow` and does **not** mint a token — binding a project is `/workflow:setup` — and it creates no local task directory, because Workflow is the only source of truth for tasks.
+**`/workflow:init` — the only required project step after install.** It does two things in one conversation: first it writes "what this project is and what it has decided" (`.spec/AGENTS.md`, `.spec/rules/system.md` empty template, knowledge nav and feature-doc template, decisions index, lint extension sample, thin root `CLAUDE.md` + `AGENTS.md` pointers), then it immediately connects to Workflow (registration, token, config, verification). The scaffolder never overwrites existing files by default and never writes a token into the session. Re-running is safe: existing project files stay; if already connected, it just reports who you are. It creates no local task directory, because Workflow is the only source of truth for tasks.
 
 The same check runs in CI without installing the plugin:
 
@@ -179,11 +179,9 @@ curl -fsSL https://workflow.games/plugin/install.sh | bash
 
 > Default `--mode full`: runtime lands in `$XDG_DATA_HOME/workflow/plugin` (or `~/.local/share/workflow/plugin`), and `~/.codex/skills/<skill>` is a symlink into that tree. `--mode skills` still installs only Markdown + VERSION and prints the capability boundary. You can also pass `--target ~/.claude/skills` or `--target .agents/skills` (project-level).
 
-**After install, every project must run `/workflow:init` once** (or tell the agent to init the project / run `init-scaffold`). Install puts the plugin on the machine; init creates the root `CLAUDE.md` + `AGENTS.md` pointers to `.spec/AGENTS.md`, `.spec/knowledge/README.md`, and `.spec/rules/system.md`. Without init, Claude / Codex have no project entry. Init does **not** write a token — binding a project is still `/workflow:setup`.
+**After install, every project must run `/workflow:init` once** (or tell the agent to initialize the project). Install puts the plugin on the machine; init creates the root `CLAUDE.md` + `AGENTS.md` pointers and immediately connects to Workflow. Without init, Claude / Codex have no project entry and are not bound to a project. No account yet? The same command walks you through registration, token creation, config, and verification. The scaffolder never writes a token into the session.
 
-No account yet? Tell the agent **"connect me to Workflow"** — `workflow-setup` walks you through registration, token creation, config, and verification.
-
-You get thirteen commands: `/workflow:setup`, `/workflow:plan <description>`, `/workflow:bug <description>`, `/workflow:take <ticket>`, `/workflow:qa <ticket>`, `/workflow:deps <ticket-or-bundle>`, `/workflow:upload <bundle>`, `/workflow:policy <show|set>`, `/workflow:feedback <description>`, `/workflow:update`, plus `/workflow:init`, `/workflow:lint`, and `/workflow:index`, new in 1.0.0.
+You get twelve commands: `/workflow:init`, `/workflow:plan <description>`, `/workflow:bug <description>`, `/workflow:take <ticket>`, `/workflow:qa <ticket>`, `/workflow:deps <ticket-or-bundle>`, `/workflow:upload <bundle>`, `/workflow:policy <show|set>`, `/workflow:feedback <description>`, `/workflow:update`, `/workflow:lint`, and `/workflow:index`.
 
 > **If you installed the `lumioagentspec` plugin**: all of its functionality is now part of this plugin as of 1.0.0, and running both injects the rules twice — so while it is still enabled, every session start prompts you to uninstall it.
 
@@ -327,7 +325,7 @@ The plugin constrains every outbound write with 21 hard gates. Before writing to
 
 ### Do I need a Workflow account before installing?
 
-No. After installing, run `/workflow:init` once in the project, then tell your agent "connect me to Workflow" — the `workflow-setup` skill walks you through registration, creating a project API token, writing the config, and verifying the connection — including live triage if you hit a 401 or 403.
+No. After installing, run `/workflow:init` once in the project — if you do not have an account yet, the same command walks you through registration, creating a project API token, writing the config, and verifying the connection, including live triage if you hit a 401 or 403.
 
 ### Does workflow-qa really test in production, or does it infer from code?
 
@@ -365,8 +363,7 @@ Please install the Workflow (workflow.games) agent plugin for me:
 2. Fetch the manifest that files points to (with the same cb parameter), download each file listed and verify its sha256; stop and tell me if any mismatch;
 3. Run the bundled installer (default --mode full): the full tree goes to $XDG_DATA_HOME/workflow/plugin, and ~/.codex/skills/<skill> points there. The skills channel allows only Markdown and VERSION; full allows allowlisted .mjs. Backups stay out of skills. The legacy files.json is not a full runtime;
 4. List the installed skills and versions;
-5. Run /workflow:init once in the current project (or init-scaffold) to create the root CLAUDE.md / AGENTS.md pointers;
-6. Then start the workflow-setup onboarding flow: first check whether ~/.config/workflow/config.toml already has a usable configuration.
+5. Run /workflow:init once in the current project (or tell the agent to initialize it): create the root CLAUDE.md / AGENTS.md pointers and immediately connect to Workflow (first check whether ~/.config/workflow/config.toml already has a usable configuration).
 ```
 
 ---

@@ -41,7 +41,7 @@ description: 以 QA 身份在真实线上环境跑测并验收 Workflow（workfl
 
 ## 前置
 
-1. **Workflow 连接与项目一致性**：完整读取 [workflow-ops 的 connection.md](../workflow-ops/references/connection.md)——凭证三级解析、`/me` 与 `/projects/current` 的分工、写操作三方一致性防呆、失败处置表都在那里，不要凭记忆重写。任一不通 → 转 workflow-setup，本技能不修配置。
+1. **Workflow 连接与项目一致性**：完整读取 [workflow-ops 的 connection.md](../workflow-ops/references/connection.md)——凭证三级解析、`/me` 与 `/projects/current` 的分工、写操作三方一致性防呆、失败处置表都在那里，不要凭记忆重写。任一不通 → 转 workflow-init，本技能不修配置。
 2. **受测环境与测试账号**：读 [references/qa-environment.md](references/qa-environment.md)——受测地址怎么解析、`[qa]` 表有哪些字段、凭据怎么取、开场怎么锁地址锁身份、工具不可用怎么降级。
 
 两项前置都过了才进入下面的流程。

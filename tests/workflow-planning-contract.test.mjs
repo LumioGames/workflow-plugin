@@ -59,7 +59,7 @@ test("正确路由规划、单次操作与独立写入授权", () => {
   assert.match(ops, /\/projects\/current.*项目.*角色\/权限/);
   assert.doesNotMatch(ops, /`\/me` 返回的项目/);
 
-  const setup = read("skills/workflow-setup/SKILL.md");
+  const setup = read("skills/workflow-init/references/connection-setup.md");
   assert.match(setup, /\/me` 返回 200/);
   assert.match(setup, /\/projects\/current` 返回 200/);
   assert.match(setup, /project\.subdomainPrefix/);

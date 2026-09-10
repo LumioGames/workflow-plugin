@@ -12,7 +12,7 @@ description: 在 Workflow（workflow.games）项目里执行字段与内容已�
 <!-- gates:start -->
 | # | 触发条件 | 动作 |
 | :-: | --- | --- |
-| **G1** | `project.subdomainPrefix`、实际 API Host、`.workflow` 所选 profile 的子域三者任一不一致；或 `publicDemo=true`；或 `.workflow` 存在却解析不出 profile | **停止**，转 workflow-setup 重新绑定。绝不把数据写进错误项目 |
+| **G1** | `project.subdomainPrefix`、实际 API Host、`.workflow` 所选 profile 的子域三者任一不一致；或 `publicDemo=true`；或 `.workflow` 存在却解析不出 profile | **停止**，转 workflow-init 重新绑定。绝不把数据写进错误项目 |
 | **G2** | 用户尚未针对**确切的项目 + 对象清单 + 数量**给出明确肯定答复，且当前模式没有有效的用户级 `full` standing authorization | **不得** POST/PATCH。内容认可、说"不错"、说"继续"都不是写入授权；`full` 也只覆盖已校验的 manifest；范围一变授权即失效 |
 | **G3** | 写操作之后没有 `GET` 读回，或读回未核对字段与子资源数量；批量建单后未翻页对账本批标题各恰好 1 条且条数 == 预期；只核自称创建的那张不算过闸 | **不得**声称「已创建 / 已修改」。部分成功如实报部分成功 |
 | **G4** | 需要在命令、日志、报告、蓝图里出现 token | **只**走环境变量携带；任何输出里只以 `wfp_` + 前 8 位指代，绝不回显完整值 |
@@ -35,9 +35,9 @@ G1–G4、G6、G7 全程适用。**G5 在本技能是授权例外**——它管�
 
 ## 前置：凭证与连接检查
 
-**完整读取 [connection.md](references/connection.md)** —— 凭证三级解析、`/me` 与 `/projects/current` 的分工、写操作三方一致性防呆、真值分层与失败处置表都在那里，是 setup / ops / planning 共用的单一真相源，不要凭记忆重写。
+**完整读取 [connection.md](references/connection.md)** —— 凭证三级解析、`/me` 与 `/projects/current` 的分工、写操作三方一致性防呆、真值分层与失败处置表都在那里，是 init / ops / planning 共用的单一真相源，不要凭记忆重写。
 
-要点：先 `GET $WORKFLOW_API_BASE/me` 验证身份，再 `GET $WORKFLOW_API_BASE/projects/current` 验证 Host 解析出的项目与 membership 角色/权限。任一不通（401/403/204/404、网络失败或没有配置）→ **转 workflow-setup 技能**处理，本技能不修配置。
+要点：先 `GET $WORKFLOW_API_BASE/me` 验证身份，再 `GET $WORKFLOW_API_BASE/projects/current` 验证 Host 解析出的项目与 membership 角色/权限。任一不通（401/403/204/404、网络失败或没有配置）→ **转 workflow-init 技能**处理，本技能不修配置。
 
 写操作前按 connection.md 逐条过防呆检查（对应 G1），并读取有效权限模式；连接、全局查重和依赖分析可以自动执行，线上写入必须交给上传器。上传器默认以 `concurrency=4` 的有界 worker pool 并发独立操作，单目标资源按锁串行并逐项读回。
 

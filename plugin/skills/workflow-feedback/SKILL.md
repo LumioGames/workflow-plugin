@@ -37,7 +37,7 @@ description: 向 Workflow（workflow.games）平台方反馈问题与建议时�
 | 匿名调公开收件端点 | 读取 PAT、携带 `Authorization` 头或 Cookie |
 | 如实转述 202 回执与 ProblemDetails | 把收件回执说成正式单，或替用户查审核进度 |
 
-分流口诀：**记到自己项目 = workflow-ops；报给平台方 = workflow-feedback。** 用户说「Workflow 有个 bug」时先分清指哪边——拿不准就问一句，别猜。答疑用法转 workflow-docs；接入与连接问题转 workflow-setup。
+分流口诀：**记到自己项目 = workflow-ops；报给平台方 = workflow-feedback。** 用户说「Workflow 有个 bug」时先分清指哪边——拿不准就问一句，别猜。答疑用法转 workflow-docs；接入与连接问题转 workflow-init。
 
 ## 前置（不需要任何凭证）
 
