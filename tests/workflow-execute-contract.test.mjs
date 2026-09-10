@@ -210,7 +210,7 @@ describe("交接纪要（接力的单一真值）", () => {
     assert.match(connection, /绝不猜、绝不省略/);
     // `.workflow` 顶层单键的旧口径必须同步——否则 [agent] 表会被当成格式错误。
     assert.match(connection, /`\[agent\]`/);
-    assert.match(read("skills/workflow-setup/SKILL.md"), /\[agent\]/);
+    assert.match(read("skills/workflow-init/references/connection-setup.md"), /\[agent\]/);
     for (const text of [skill, flow, handoff]) {
       assert.match(text, /agentLabel/);
     }
@@ -308,9 +308,9 @@ describe("共享纪律：建单最小正文（card-spec.md）", () => {
 });
 
 describe("共享纪律：Agent 写路径", () => {
-  test("六条规则写进 ops / setup / 落单路径", () => {
+  test("六条规则写进 ops / init / 落单路径", () => {
     const connection = read("skills/workflow-ops/references/connection.md");
-    const setup = read("skills/workflow-setup/SKILL.md");
+    const setup = read("skills/workflow-init/references/connection-setup.md");
     const delivery = read("skills/workflow-planning/references/api-delivery.md");
     const calls = read("skills/workflow-ops/references/call-templates.md");
     for (const text of [opsSkill, connection, setup, delivery]) {

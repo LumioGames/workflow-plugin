@@ -15,7 +15,7 @@
 | <!-- 填写 --> | | |
 
 - 遇到单号、或想知道线上有什么：先 `GET /search`（或 Room overview），再看本地索引；状态以线上 transitions 为准，不凭本地记忆流转。
-- 项目绑定用仓根 `.workflow`（只含 `profile` 名，不含 token），由 `/workflow:setup` 写入。
+- 项目绑定用仓根 `.workflow`（只含 `profile` 名，不含 token），由 `/workflow:init` 的接入阶段写入。
 
 ## 收口命令
 

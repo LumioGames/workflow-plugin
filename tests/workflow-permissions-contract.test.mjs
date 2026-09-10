@@ -14,7 +14,7 @@ function read(relativePath) {
 
 const policy = read("skills/workflow-ops/references/permission-modes.md");
 const ops = read("skills/workflow-ops/SKILL.md");
-const setup = read("skills/workflow-setup/SKILL.md");
+const setup = read("skills/workflow-init/references/connection-setup.md");
 const planning = read("skills/workflow-planning/SKILL.md");
 const upload = read("skills/workflow-upload/SKILL.md");
 const command = read("commands/policy.md");

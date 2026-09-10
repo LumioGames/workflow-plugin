@@ -1,9 +1,6 @@
----
-name: workflow-setup
-description: 首次接入 Workflow（workflow.games）、还没有账号或 API token、调 Workflow API 遇到 401 或 403 需要诊断、想查当前连接状态、或要新增/切换项目 profile 时使用。负责注册引导、token 配置写盘与连接验证，不做业务操作。
----
+# 接入 Workflow 并验证连接
 
-# workflow-setup — 接入 Workflow 并验证连接
+本文件是 **workflow-init 阶段 2** 的正文。阶段 1（`init-scaffold`）不写 token、不写 `.workflow`；凭据与项目绑定只在这里处理。
 
 ## 完成判据（先看这个）
 
@@ -13,9 +10,9 @@ description: 首次接入 Workflow（workflow.games）、还没有账号或 API 
 
 ## Step 0 — 静默探测（每次都先做，不问用户）
 
-按 [workflow-ops/references/connection.md](../workflow-ops/references/connection.md) 的**凭证解析顺序（三级）**取 `base_url` 与 token——三级规则、API 根地址规范化和可抄的 shell 片段都在那份共享文件里，本技能不另写一份。
+按 [workflow-ops/references/connection.md](../../workflow-ops/references/connection.md) 的**凭证解析顺序（三级）**取 `base_url` 与 token——三级规则、API 根地址规范化和可抄的 shell 片段都在那份共享文件里，本阶段不另写一份。
 
-取到凭证 → 依次探测 `GET $WORKFLOW_API_BASE/me` 与 `GET $WORKFLOW_API_BASE/projects/current`。两者通过且项目与 profile 一致 → 直接按完成判据报告，结束本技能。探测失败或全局 config 不存在 → 按下面分支走。
+取到凭证 → 依次探测 `GET $WORKFLOW_API_BASE/me` 与 `GET $WORKFLOW_API_BASE/projects/current`。两者通过且项目与 profile 一致 → 直接按完成判据报告，结束本阶段。探测失败或全局 config 不存在 → 按下面分支走。
 
 curl 携带 token 一律走环境变量，不把明文拼进命令行：
 
@@ -30,10 +27,10 @@ curl -sS -H "Authorization: Bearer $WORKFLOW_TOKEN" "$WORKFLOW_API_BASE/projects
 
 - **位置**：项目仓库根（或当前工作目录）。查找规则：从当前目录向上逐级找，取最近的一个，到含 `.git` 的目录或文件系统根为止。
 - **内容**：一行 TOML——`profile = "<profile 名>"`（双引号）；允许**整行** `#` 注释（不支持行内注释，会导致解析落空）。**顶层仅此一键**；另可有两个可选表：`[qa]` 供 workflow-qa 读取受测线上地址与凭据的**环境变量名**，`[agent]` 声明这个仓库的 Agent 标签（都见下）。整个文件**不含 token 也不含任何凭据**，可提交进版本库与全队共享（每人的 token 仍在各自全局 config 里）。
-- **写入时机**：setup 完成项目绑定时问用户「要不要把绑定写进当前项目（`.workflow` 文件）」，默认写。
+- **写入时机**：接入完成项目绑定时问用户「要不要把绑定写进当前项目（`.workflow` 文件）」，默认写。
 - **解析落空 = 停止，不回落**：`.workflow` 存在但读不出 profile 名（写了行内注释、用了单引号、键名拼错）时，**必须停下让用户修**，绝不悄悄改用全局 `current_profile`——那正好会把数据写进另一个项目，是这套绑定机制要防的唯一一件事。
 
-可选的 `[qa]` 表（只有用 workflow-qa 做线上验收时才需要，setup 不主动追问）：
+可选的 `[qa]` 表（只有用 workflow-qa 做线上验收时才需要，接入阶段不主动追问）：
 
 ```toml
 profile = "<profile 名>"
@@ -57,18 +54,18 @@ profile = "<profile 名>"
 label = "client"
 ```
 
-`label` 就是交接纪要 `POST /handoffs` 的 `agentLabel`，标明**是哪个仓库的 Agent** 写的（`client` / `server` / `game` 之类的小写 slug，同一仓库内保持稳定）。它是展示用的来源标签，**不参与鉴权、不构成身份**，也不是凭据——正因如此才适合随文件提交给全队。解析优先级 env `WORKFLOW_AGENT_LABEL` → `[agent].label` → 都没有就在用到时问用户一次（口径见 [workflow-ops/references/connection.md](../workflow-ops/references/connection.md) 第一节）。setup 写 `.workflow` 时顺带问一句要不要写死这个标签，用户说不用就不写。
+`label` 就是交接纪要 `POST /handoffs` 的 `agentLabel`，标明**是哪个仓库的 Agent** 写的（`client` / `server` / `game` 之类的小写 slug，同一仓库内保持稳定）。它是展示用的来源标签，**不参与鉴权、不构成身份**，也不是凭据——正因如此才适合随文件提交给全队。解析优先级 env `WORKFLOW_AGENT_LABEL` → `[agent].label` → 都没有就在用到时问用户一次（口径见 [workflow-ops/references/connection.md](../../workflow-ops/references/connection.md) 第一节）。写 `.workflow` 时顺带问一句要不要写死这个标签，用户说不用就不写。
 
 `.workflow` 是独立文件，**绝不合并进 `config.toml`**——`config.toml` 的格式合同一个键都不能加（见分支 C 的写盘规则），`[qa]` 与 `[agent]` 只属于 `.workflow`。
 
 ## 权限模式策略
 
-读取 [workflow-ops/references/permission-modes.md](../workflow-ops/references/permission-modes.md)。
+读取 [workflow-ops/references/permission-modes.md](../../workflow-ops/references/permission-modes.md)。
 权限不写入凭证文件：用户级策略在 `~/.config/workflow/policy.toml`，项目级降权覆盖在
 `.workflow-policy`。缺失时默认 `auto`；未知模式或策略解析失败时停止所有线上写入。向用户报告
 当前 profile、项目覆盖和最终生效模式；`full` 只能由用户级 profile 显式开启，项目文件不得升权。
 策略模式不等于 PAT scope，不以探测性 POST 验证权限。项目级 `.workflow-policy` 只能降权；本地
-`.workflow-drafts/` 是待上传 outbox，setup 和 token 配置流程不得覆盖、清理或上传其中内容。
+`.workflow-drafts/` 是待上传 outbox，接入与 token 配置流程不得覆盖、清理或上传其中内容。
 
 ## 分支 A — 用户还没有账号
 

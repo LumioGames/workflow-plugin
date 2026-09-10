@@ -127,7 +127,7 @@ export function resolveCredentials({ env = process.env, cwd = process.cwd(), hom
     return { ok: false, reason: 'profile-missing', warn: `config.toml 里没有 [profiles.${profile}]（不回落 current_profile）` }
   }
   if (!section.base_url || !section.token) {
-    return { ok: false, reason: 'profile-incomplete', warn: `profile「${profile}」缺 base_url 或 token：转 workflow-setup 补齐` }
+    return { ok: false, reason: 'profile-incomplete', warn: `profile「${profile}」缺 base_url 或 token：转 workflow-init 补齐` }
   }
 
   const baseUrl = normalizeBase(section.base_url)

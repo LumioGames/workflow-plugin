@@ -16,7 +16,7 @@ description: 以执行者身份承接并交付一张已存在的 Workflow（work
 <!-- gates:start -->
 | # | 触发条件 | 动作 |
 | :-: | --- | --- |
-| **G1** | `project.subdomainPrefix`、实际 API Host、`.workflow` 所选 profile 的子域三者任一不一致；或 `publicDemo=true`；或 `.workflow` 存在却解析不出 profile | **停止**，转 workflow-setup 重新绑定。绝不把数据写进错误项目 |
+| **G1** | `project.subdomainPrefix`、实际 API Host、`.workflow` 所选 profile 的子域三者任一不一致；或 `publicDemo=true`；或 `.workflow` 存在却解析不出 profile | **停止**，转 workflow-init 重新绑定。绝不把数据写进错误项目 |
 | **G2** | 用户尚未针对**确切的项目 + 对象清单 + 数量**给出明确肯定答复，且当前模式没有有效的用户级 `full` standing authorization | **不得** POST/PATCH。内容认可、说"不错"、说"继续"都不是写入授权；`full` 也只覆盖已校验的 manifest；范围一变授权即失效 |
 | **G3** | 写操作之后没有 `GET` 读回，或读回未核对字段与子资源数量；批量建单后未翻页对账本批标题各恰好 1 条且条数 == 预期；只核自称创建的那张不算过闸 | **不得**声称「已创建 / 已修改」。部分成功如实报部分成功 |
 | **G4** | 需要在命令、日志、报告、蓝图里出现 token | **只**走环境变量携带；任何输出里只以 `wfp_` + 前 8 位指代，绝不回显完整值 |
@@ -32,9 +32,9 @@ G1、G3、G4、G6、G7 全程适用。G2 的写入授权由**用户明确指派�
 按 [connection.md](../workflow-ops/references/connection.md) 解析凭证，然后分流：
 
 - **模式一 · 自持凭证直连**：环境变量或 `.workflow` 两级解析成功且 `/me`、`/projects/current` 验证通过 → 读写全程自己做。
-- **模式二 · 无凭证，调度方代写**：派遣 prompt 明示「凭证在调度方 / 由调度方回写」，或本机解析不出凭证 → **不调任何 Workflow API**。卡内容以派遣 prompt 附带的为准；交回物是 [references/handoff.md](references/handoff.md) 第三节的结构化报告，由调度方代做全部回写。**不要求用户或调度方把 token 贴进会话**（要配凭证转 workflow-setup）。
+- **模式二 · 无凭证，调度方代写**：派遣 prompt 明示「凭证在调度方 / 由调度方回写」，或本机解析不出凭证 → **不调任何 Workflow API**。卡内容以派遣 prompt 附带的为准；交回物是 [references/handoff.md](references/handoff.md) 第三节的结构化报告，由调度方代做全部回写。**不要求用户或调度方把 token 贴进会话**（要配凭证转 workflow-init）。
 
-**硬规则（两种模式之外没有第三条路）**：当前目录**没有 `.workflow` 绑定**时，禁止靠全局 `current_profile` 兜底解析凭证执行任何**写操作**——即使 config 里只有一个 profile。执行 Agent 常被派到临时目录/工作树干活，全局兜底写进去的是「碰巧配过的项目」，这是把数据写错项目之外的另一种越权写入。要写：先补绑定（转 workflow-setup 写 `.workflow`），或走模式二交回。
+**硬规则（两种模式之外没有第三条路）**：当前目录**没有 `.workflow` 绑定**时，禁止靠全局 `current_profile` 兜底解析凭证执行任何**写操作**——即使 config 里只有一个 profile。执行 Agent 常被派到临时目录/工作树干活，全局兜底写进去的是「碰巧配过的项目」，这是把数据写错项目之外的另一种越权写入。要写：先补绑定（转 workflow-init 写 `.workflow`），或走模式二交回。
 
 ## 流程（模式一按权限策略写回；模式二做 2、3、4、6，其余写进交回报告）
 

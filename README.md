@@ -38,9 +38,9 @@
 
 **Workflow Agent 插件把 Claude Code、Cursor、Codex 等 AI 编码 Agent 直接接入 [Workflow](https://workflow.games)（workflow.games）项目管理平台。** 装好之后，AI Agent 能把一句话需求拆成可执行的开发蓝图并落单、带查重地记录缺陷、在真实线上环境跑测验收，并按判定流转工单状态 —— 且**每一次写入都必须读回验证**才允许声称成功。
 
-插件包含 16 个技能、13 个斜杠命令、21 条硬闸门（G1–G7 落单闸门、Q1–Q7 QA 闸门与 F1–F7 反馈闸门），以线上 OpenAPI 合同为真值的自动化测试并每周校验合同漂移。规划和所有写回默认先落 `.workflow-drafts/<bundleId>/`，依赖分析与受控并发上传由专用 skill 处理。遵循 [Agent Plugins 1.0.0](https://agent-plugins.org/) 规范，同时兼容 Claude Code marketplace，MIT 许可。
+插件包含 16 个技能、12 个斜杠命令、21 条硬闸门（G1–G7 落单闸门、Q1–Q7 QA 闸门与 F1–F7 反馈闸门），以线上 OpenAPI 合同为真值的自动化测试并每周校验合同漂移。规划和所有写回默认先落 `.workflow-drafts/<bundleId>/`，依赖分析与受控并发上传由专用 skill 处理。遵循 [Agent Plugins 1.0.0](https://agent-plugins.org/) 规范，同时兼容 Claude Code marketplace，MIT 许可。
 
-**1.0.0 起它还管开发本身怎么做**：会话开始自动注入通用规则并把线上单据拉成本地索引，随包附带 brainstorming / TDD / 排障 / 沉淀 / 收审五个方法技能与一个只读 reviewer 子 Agent，外加项目文档结构体检（`/workflow:lint`）与脚手架（`/workflow:init`）。
+**1.0.0 起它还管开发本身怎么做**：会话开始自动注入通用规则并把线上单据拉成本地索引，随包附带 brainstorming / TDD / 排障 / 沉淀 / 收审五个方法技能与一个只读 reviewer 子 Agent，外加项目文档结构体检（`/workflow:lint`）与项目初始化（`/workflow:init`）。
 
 ---
 
@@ -76,7 +76,7 @@ Agent 十分钟改完三个模块，然后你打开 PM 系统，一条记录都�
 
 | 技能 | 一句话 |
 | :-- | :-- |
-| 🔌 `workflow-setup` | 从零接入：注册引导 → 建 token → 写配置 → 验证连接 → 401/403 现场分诊 |
+| 🌱 `workflow-init` | 每个项目跑一次：生成 `.spec` 骨架与根入口，并接入 Workflow（注册 → token → 验证连接；已连通则只报告身份） |
 | 🧠 `workflow-planning` | **把一句话变成一套能直接派活的开发蓝图** —— 判定单需求还是需求室、拆交付轨道、排并行 wave、写验收 |
 | ⚡ `workflow-ops` | 干活：建需求 / 需求室 / 里程碑、记 bug（自带查重）、查任务、指派、流转、重开、评论、附件、交接纪要 |
 | 🤝 `workflow-execute` | **拿单执行到交回** —— 找到指派给自己的单、读全（含所属需求室最近的交接纪要）、先摆决策点讨论再流转开工、并行子 Agent 干活，完成后按统一模板回写证据、留一条交接纪要再流转待验收；支持无凭证由调度方代写 |
@@ -119,7 +119,7 @@ UUID 对验证图谱结果。
 - 注入上下文的**只有一行计数**（路径 / 条数 / 各 Room 计数 / 多久前刷新），正文一个字不进——要找单号时 Agent 自己 grep 那个文件，几万字的看板不占你的上下文预算；
 - **索引只用来找单号和 Room，状态以线上为准**——流转前一律现查 transitions，不许照索引里的 `status` 办事。
 
-想立刻刷新（比如刚建完一批单）就跑 `/workflow:index`，它忽略 15 分钟有效期。当前目录没有 `.workflow` 标记时，它什么都不拉、也不警告——先 `/workflow:setup` 绑定项目。
+想立刻刷新（比如刚建完一批单）就跑 `/workflow:index`，它忽略 15 分钟有效期。当前目录没有 `.workflow` 标记时，它什么都不拉、也不警告——先 `/workflow:init` 绑定项目。
 
 ### 结构体检与脚手架
 
@@ -129,7 +129,7 @@ UUID 对验证图谱结果。
 2. **项目扩展** —— 可选的 `.spec/tools/lint-extensions.mjs`，导出 `api = 1` 即被加载（版本对不上会**报错**，不会静默跳过），项目在这里加自己的检查项；
 3. **指纹** —— 项目的 `AGENTS.md` / `rules/` 里出现插件的保留标题、或连续 3 行与插件规则逐字相同，就报「项目抄了插件」。通用规则每次会话注入，抄一份只会让两边慢慢长歪。
 
-**`/workflow:init` —— 每个项目装好插件后必须跑一次。** 只写「这个项目是什么、定过什么」：`.spec/AGENTS.md`、`.spec/rules/system.md`（项目专属红线的空模板）、`.spec/knowledge/README.md` 与功能文档模板、`.spec/decisions/README.md`、`.spec/tools/lint-extensions.mjs` 样例，以及根 `CLAUDE.md` 与 `AGENTS.md` 薄指针（指向上面三份；Claude 读前者，Codex 与其它宿主读后者）。默认不覆盖已有文件，可以升级插件后再跑一次补齐新模板。**不写 `.workflow`、不生成 token**——项目绑定走 `/workflow:setup`；也不生成本地任务目录，任务真值只有 Workflow。
+**`/workflow:init` —— 装好插件后每个项目必须跑的唯一步骤。** 一次做完两件事：先生成「这个项目是什么、定过什么」（`.spec/AGENTS.md`、`.spec/rules/system.md` 空模板、知识导航与功能文档模板、决策索引、lint 扩展样例、根 `CLAUDE.md` 与 `AGENTS.md` 薄指针），再立刻接入 Workflow（注册引导、建 token、写配置、验证连接）。脚手架默认不覆盖已有文件，token 不进会话、不由脚手架脚本写入。重跑安全：已有项目文件保持原样，已连通则只报告身份。不生成本地任务目录，任务真值只有 Workflow。
 
 CI 里不装插件也能跑同一套体检：
 
@@ -193,11 +193,9 @@ curl -fsSL https://workflow.games/plugin/install.sh | bash
 
 > 默认 `--mode full`：运行时落到 `$XDG_DATA_HOME/workflow/plugin`（缺 XDG 时 `~/.local/share/workflow/plugin`），`~/.codex/skills/<skill>` 是指向运行时的 symlink。`--mode skills` 仍只装 Markdown + VERSION，并打印能力边界。也可 `--target ~/.claude/skills` 或 `--target .agents/skills`（项目级）。
 
-**装好之后，每个项目必须跑一次 `/workflow:init`**（或对 Agent 说「初始化这个项目」/ 跑 `init-scaffold`）。安装只把插件放到机器上；init 才生成仓根 `CLAUDE.md` + `AGENTS.md`，指向 `.spec/AGENTS.md`、`.spec/knowledge/README.md`、`.spec/rules/system.md`。不跑 init，Claude / Codex 没有项目入口。init **不写 token**——项目绑定仍走 `/workflow:setup`。
+**装好之后，每个项目必须跑一次 `/workflow:init`**（或对 Agent 说「初始化这个项目」）。安装只把插件放到机器上；init 才生成仓根 `CLAUDE.md` + `AGENTS.md`，并立刻接入 Workflow。不跑 init，Claude / Codex 没有项目入口，也还没连上项目。没有账号也不要紧——同一条命令会带你走完注册、建 token、写配置、验证连接。脚手架不把 token 写进会话。
 
-没有账号也不要紧 —— 对 Agent 说 **「接入 Workflow」**，`workflow-setup` 一步步带你走完注册、建 token、写配置、验证连接。
-
-装好即得十三个命令：`/workflow:setup`、`/workflow:plan <描述>`、`/workflow:bug <描述>`、`/workflow:take <单号>`、`/workflow:qa <单号>`、`/workflow:deps <单号或草稿>`、`/workflow:upload <bundle>`、`/workflow:policy <show|set>`、`/workflow:feedback <描述>`、`/workflow:update`，以及 1.0.0 新增的 `/workflow:init`、`/workflow:lint`、`/workflow:index`。
+装好即得十二个命令：`/workflow:init`、`/workflow:plan <描述>`、`/workflow:bug <描述>`、`/workflow:take <单号>`、`/workflow:qa <单号>`、`/workflow:deps <单号或草稿>`、`/workflow:upload <bundle>`、`/workflow:policy <show|set>`、`/workflow:feedback <描述>`、`/workflow:update`、`/workflow:lint`、`/workflow:index`。
 
 > **装过 `lumioagentspec` 插件的注意**：它的全部功能已并入本插件 1.0.0，两边同时启用会重复注入规则——所以检测到它还开着时，每次会话开始都会提示你卸载。
 
@@ -333,7 +331,7 @@ Agent 只整理你**主动提供**的信息（不扫仓库、不读任何凭证�
 
 凭证按 **环境变量 → `.workflow` 标记 → 全局 `current_profile`** 三级解析 —— **人在哪个目录干活，就连哪个项目**，不用手动切。配置里有多个 profile 而当前目录没绑定？Agent 会停下来问你，而不是猜。拿单执行的场景更严：**没有 `.workflow` 绑定的目录里，执行 Agent 禁止拿全局默认项目兜底写数据**——要么先绑定，要么交回给调度方代写。
 
-首次在某个项目目录接入时，`workflow-setup` 会引导你建 token 并写好 `.workflow`。
+首次在某个项目目录跑 `/workflow:init` 时，接入阶段会引导你建 token 并写好 `.workflow`。
 
 用 `workflow-qa` 做线上验收时，`.workflow` 可以再加一个**可选**的 `[qa]` 表，声明受测线上地址、入口路径，以及测试账号凭据的**环境变量名**：
 
@@ -374,8 +372,7 @@ surfaces = ["web"]
 2. 抓取 files 指向的清单（加同样的 cb 参数），逐个下载清单中的文件并校验 sha256，不符则停止并告诉我；
 3. 跑插件自带的安装器（默认 --mode full）：完整树落到 $XDG_DATA_HOME/workflow/plugin，~/.codex/skills/<skill> 指过去。技能渠道只允许 Markdown 与 VERSION；full 允许清单白名单内的 .mjs。备份不进 skills。旧 files.json 不能当完整运行时；
 4. 列出安装的技能与版本；
-5. 在当前项目跑一次 /workflow:init（或 init-scaffold），生成仓根 CLAUDE.md / AGENTS.md 指针；
-6. 然后直接开始 workflow-setup 技能的接入流程：先检测本机 ~/.config/workflow/config.toml 是否已有可用配置。
+5. 在当前项目跑一次 /workflow:init（或对 Agent 说「初始化这个项目」）：生成仓根 CLAUDE.md / AGENTS.md 指针，并立刻接入 Workflow（先检测本机 ~/.config/workflow/config.toml 是否已有可用配置）。
 ```
 
 ---
@@ -396,7 +393,7 @@ Workflow Agent 插件是**技能包（skills），不是 MCP server**。插件�
 
 ### 使用这个插件需要先有 Workflow 账号吗？
 
-不需要。装完先在项目里跑一次 `/workflow:init`，再对 Agent 说「接入 Workflow」，`workflow-setup` 技能会引导你完成注册、创建项目 API Token、写入配置、验证连接，并在遇到 401 / 403 时现场分诊。
+不需要。装完在项目里跑一次 `/workflow:init` 即可——没有账号时同一条命令会引导注册、创建项目 API Token、写入配置、验证连接，并在遇到 401 / 403 时现场分诊。
 
 ### workflow-qa 是真的去线上点，还是读代码猜结论？
 

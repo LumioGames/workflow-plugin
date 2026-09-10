@@ -1,12 +1,12 @@
 # 连接、凭证与真值（共享规则）
 
-**本文件是 setup / ops / planning 三个技能共用的单一真相源。** 任何一处需要「怎么取 token」「怎么确认在哪个项目」「查到什么算数」「报错怎么办」，都读这里，不要在各自技能里另写一份——这段管的是「会不会把数据写进错项目」，写岔了代价由用户承担。
+**本文件是 init / ops / planning 三个技能共用的单一真相源。** 任何一处需要「怎么取 token」「怎么确认在哪个项目」「查到什么算数」「报错怎么办」，都读这里，不要在各自技能里另写一份——这段管的是「会不会把数据写进错项目」，写岔了代价由用户承担。
 
 ## 一、凭证解析顺序（三级）
 
 1. **环境变量** `WORKFLOW_API_BASE` + `WORKFLOW_TOKEN`（CI 与一次性覆盖，最高优先）；`WORKFLOW_API_BASE` 以 `/api/v1` 结尾。
 2. **`.workflow` 标记**：从当前目录向上逐级找，取最近的一个，到含 `.git` 的目录或文件系统根为止；按其 `profile` 名到 `~/.config/workflow/config.toml` 的 `[profiles.<名>]` 取 `base_url` 与 `token`。
-   - 该 profile 在 config 里不存在 → 走 workflow-setup 的建 token 分支为这个项目补一枚。
+   - 该 profile 在 config 里不存在 → 走 workflow-init 的建 token 分支为这个项目补一枚。
    - **文件存在但解析不出 profile 名**（写了行内注释、用了单引号、键名拼错）→ **停止并报错**，绝不回落第 3 级。标记文件在场却被忽略，等于静默写进另一个项目。
    - 文件顶层**只有 `profile` 一个键**；另有两个可选表——`[qa]`（workflow-qa 的受测环境）与 `[agent]`（`label` = 交接纪要的 `agentLabel`），按 TOML 规则必在顶层键之后，因此下面的解析片段取到的仍是顶层 `profile`。本文件的凭证解析**不读这两张表**，两张表里也都不允许出现任何凭据。
 3. **全局 `current_profile` 兜底**，硬条件：config 里 profile 多于一个且当前目录没有 `.workflow` 时**不得静默使用**——必须先问用户「这个目录绑哪个项目」，答后写 `.workflow` 再继续；只有单 profile 时可直接用。
@@ -46,8 +46,8 @@ if [ -z "$WORKFLOW_TOKEN" ] || [ -z "$WORKFLOW_API_BASE" ]; then
       export WORKFLOW_API_BASE="$BASE/api/v1"
       export WORKFLOW_TOKEN="$TOK"
     else
-      # 不导出半截凭证：缺 base_url 或缺 token 都转 workflow-setup 补齐
-      echo "profile「$PROFILE」配置不完整（缺 base_url 或 token）：转 workflow-setup 补齐" >&2
+      # 不导出半截凭证：缺 base_url 或缺 token 都转 workflow-init 补齐
+      echo "profile「$PROFILE」配置不完整（缺 base_url 或 token）：转 workflow-init 补齐" >&2
     fi
   fi
 fi
@@ -84,7 +84,7 @@ curl -sS -H "Authorization: Bearer $WORKFLOW_TOKEN" "$WORKFLOW_API_BASE/projects
 
 - `/projects/current` 的 `project.subdomainPrefix` 必须与实际 API Host **以及** `.workflow` 所选 profile 的 `base_url` 子域三方一致。
 - 预检看 `membership.moduleAccess`，**不看** `permissions`。建需求要 `requirements ≥ edit`，把需求归属到里程碑要 `milestones ≥ manage`。PAT 请求的 `moduleAccess` 已与 token scope 求交：`read_only` 六模块全是 `read`，`scopeMode=all` 与角色相同。
-- 不一致或 `publicDemo=true` → 停下转 workflow-setup 重新绑定/分诊，**绝不把数据写进错误项目**。
+- 不一致或 `publicDemo=true` → 停下转 workflow-init 重新绑定/分诊，**绝不把数据写进错误项目**。
 
 `membership.permissions` 是角色原值，**不含**当前 PAT 的 scope，不能当预检。实际写端点返回 403 仍按权限问题停止；绝不靠探测性写入验证 scope。
 
@@ -113,7 +113,7 @@ curl -sS -H "Authorization: Bearer $WORKFLOW_TOKEN" "$WORKFLOW_API_BASE/projects
 | 状况 | 处置 |
 | --- | --- |
 | 422 | 按 ProblemDetails 的 errors 补齐/修正字段**重试一次**；第二次仍失败就停下，把 `traceId` 贴给用户 |
-| 401 / 403 | 转 workflow-setup 分诊，不在业务技能里试来试去 |
+| 401 / 403 | 转 workflow-init 分诊，不在业务技能里试来试去 |
 | 409 | 并发冲突：重新读取并报告变化，**不得覆盖** |
 | 423 | 项目已冻结，**不重试**，转告用户找管理员解冻 |
 | 429 | 限流 per-token（约 60 突发 / 120 每分钟）；按 `Retry-After` 退避重试**至多 3 次**，并降低后续调用频率。429 表示请求被拒绝、未落库，与「可能已送达」不是同一类 |
