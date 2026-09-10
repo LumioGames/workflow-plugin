@@ -8,6 +8,7 @@
 
 - `spec-lint` 的 `core-files`：缺任一即报错；不再接受「至少一个」。
 - `/workflow:init` 生成的根 `CLAUDE.md` 只有三行 `@import`；根 `AGENTS.md` 同一组指针并写明「Codex 须主动 Read 这三份」。已存在不覆盖。不抄插件规则。
+- README 写明：每条安装路径之后，每个项目必须跑一次 `/workflow:init`；只装插件没有项目入口。
 
 ## [1.3.4]
 

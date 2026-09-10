@@ -1,9 +1,9 @@
 ---
-description: 在当前项目生成 `.spec/` 骨架与根 CLAUDE.md / AGENTS.md（只有项目专属那一半；不写 .workflow、不生成 token）
+description: 装好插件后每个项目必须跑一次：生成 `.spec/` 骨架与根 CLAUDE.md / AGENTS.md（只有项目专属那一半；不写 .workflow、不生成 token）
 argument-hint: "[--force]"
 ---
 
-调起 Workflow 插件的项目脚手架。执行：
+装好插件后每个项目必须跑一次——安装只把插件放到机器上，本命令才写出仓根指针。执行：
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/tools/init-scaffold.mjs" --target "${CLAUDE_PROJECT_DIR}" $ARGUMENTS
