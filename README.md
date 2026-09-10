@@ -191,7 +191,7 @@ npx plugins add LumioGames/workflow-plugin
 curl -fsSL https://workflow.games/plugin/install.sh | bash
 ```
 
-> 默认装到 `~/.codex/skills`；也可 `--target ~/.claude/skills` 或 `--target .agents/skills`（项目级）。
+> 默认 `--mode full`：运行时落到 `$XDG_DATA_HOME/workflow/plugin`（缺 XDG 时 `~/.local/share/workflow/plugin`），`~/.codex/skills/<skill>` 是指向运行时的 symlink。`--mode skills` 仍只装 Markdown + VERSION，并打印能力边界。也可 `--target ~/.claude/skills` 或 `--target .agents/skills`（项目级）。
 
 没有账号也不要紧 —— 装完直接对 Agent 说 **「接入 Workflow」**，`workflow-setup` 一步步带你走完注册、建 token、写配置、验证连接。
 
@@ -356,9 +356,9 @@ surfaces = ["web"]
 | :-- | :-- |
 | Claude Code（marketplace） | `claude plugin marketplace update workflow-plugin` + `claude plugin update workflow@workflow-plugin --scope user`（更新后需重启会话）；也支持 autoUpdate 自动升级或在 `/plugin` 界面手动更新 |
 | Agent Plugins 客户端 | 重跑一次 `npx plugins add LumioGames/workflow-plugin` |
-| Codex / 手动安装 | 对 Agent 说「更新 workflow 插件」—— 查线上版本 → 逐文件校验 sha256 → 备份旧版 → 就位 |
+| Codex / 手动安装 | 对 Agent 说「更新 workflow 插件」—— 先判渠道，再走 `workflow-install.mjs`（默认 full）：sha256 + 白名单可执行文件，备份落到 `$XDG_DATA_HOME/workflow/backups/`，不进 skills 扫描目录 |
 
-自更新只从 `workflow.games` 域下载，技能包只允许 `.md` 与 `VERSION` 纯文本 —— **清单里出现任何可执行文件，立即中止并告警。**
+自更新只从 `workflow.games` 域（或本地 `--from-dir`）下载。**技能渠道**只允许 `.md` 与 `VERSION`；**完整运行时**允许 `runtime-manifest.json` 白名单内的 `.mjs` —— 不在白名单的可执行文件立即中止、不落盘。官网旧 `files.json` 不能当 full。
 
 ---
 
@@ -370,7 +370,7 @@ surfaces = ["web"]
 请为我安装 Workflow（workflow.games）Agent 插件：
 1. 抓取 https://workflow.games/plugin/version.json?cb=<当前时间戳>，读出 version 与 files 字段；
 2. 抓取 files 指向的清单（加同样的 cb 参数），逐个下载清单中的文件并校验 sha256，不符则停止并告诉我；
-3. 把 skills/ 下的技能目录写入 ~/.codex/skills/（Claude Code 手动安装则写入 ~/.claude/skills/，项目级安装写入 .agents/skills/）；技能包只应包含 Markdown 与 VERSION 文本文件，发现可执行文件立即停止；
+3. 跑插件自带的安装器（默认 --mode full）：完整树落到 $XDG_DATA_HOME/workflow/plugin，~/.codex/skills/<skill> 指过去。技能渠道只允许 Markdown 与 VERSION；full 允许清单白名单内的 .mjs。备份不进 skills。旧 files.json 不能当完整运行时；
 4. 列出安装的技能与版本；
 5. 然后直接开始 workflow-setup 技能的接入流程：先检测本机 ~/.config/workflow/config.toml 是否已有可用配置。
 ```
@@ -421,7 +421,7 @@ Workflow Agent 插件是**技能包（skills），不是 MCP server**。插件�
 
 ### 这个插件开源吗？用什么许可？
 
-开源，MIT 许可，源码在 [github.com/LumioGames/workflow-plugin](https://github.com/LumioGames/workflow-plugin)。技能包只允许包含 Markdown 与 `VERSION` 纯文本文件 —— 自更新时清单里出现任何可执行文件会立即中止并告警。
+开源，MIT 许可，源码在 [github.com/LumioGames/workflow-plugin](https://github.com/LumioGames/workflow-plugin)。技能渠道只允许 Markdown 与 `VERSION`；完整运行时允许清单白名单内的 `.mjs`。不在白名单的可执行文件会立即中止。
 
 ---
 

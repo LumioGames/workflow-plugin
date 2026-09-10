@@ -1,0 +1,16 @@
+{
+  "version": "1.2.0",
+  "baseUrl": "https://workflow.games/plugin/codex/skills",
+  "files": [
+    {
+      "path": "workflow-update/SKILL.md",
+      "sha256": "5bd67e38a6e81cfaa64ae22252d18431a468b3d379a51770596140af732205c8",
+      "bytes": 5205
+    },
+    {
+      "path": "workflow-update/VERSION",
+      "sha256": "1e5b51cde515396a9fa762909cf8ca6584ccc564b325d2eebeea76175fe95c4d",
+      "bytes": 6
+    }
+  ]
+}

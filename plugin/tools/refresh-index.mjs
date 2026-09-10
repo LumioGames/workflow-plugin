@@ -63,6 +63,26 @@ class RefreshError extends Error {
   }
 }
 
+const PROXY_ENV_NAMES = ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy']
+
+/** 失败 reason 只带分类与代理变量名，不带代理 URL、不带 token。 */
+export function classifyRefreshFailure(error, env = process.env) {
+  const raw = error instanceof RefreshError ? error.message : `未知错误：${error?.message ?? error}`
+  const tags = []
+  const status = error?.status
+  if (status === 401 || /HTTP 401/.test(raw)) tags.push('401')
+  else if (status === 403 || /HTTP 403/.test(raw)) tags.push('403')
+  if (/超时|总预算用尽/.test(raw)) tags.push('超时')
+  if (/网络错误/.test(raw)) tags.push('离线')
+  const proxies = PROXY_ENV_NAMES.filter((name) => env[name])
+  if (proxies.length) tags.push(`已设代理变量 ${proxies.join(',')}`)
+  const detail = String(raw)
+    .replace(/https?:\/\/[^\s)'"]+/gi, '[url]')
+    .replace(/wfp_[0-9a-zA-Z]+/g, 'wfp_…')
+    .replace(/Bearer\s+\S+/gi, 'Bearer …')
+  return tags.length ? `${tags.join(' / ')}：${detail}` : detail
+}
+
 function isoMs(ms) {
   return new Date(ms).toISOString()
 }
@@ -305,8 +325,8 @@ export async function refreshIndex({
     }
     if (mode === 'full') next = await pullFull({ getJson, now })
   } catch (error) {
-    const reason = error instanceof RefreshError ? error.message : `未知错误：${error?.message ?? error}`
-    log(`workflow index：${previous ? '离线沿用旧快照' : '未生成'}（${reason}）`)
+    const reason = classifyRefreshFailure(error, env)
+    log(`workflow index：stale，${previous ? '旧快照保留' : '未生成'}（${reason}）`)
     if (previous) {
       const staleDoc = { ...previous, stale: { attemptedAt: isoMs(now()), reason } }
       try { writeIndexFile(path, staleDoc, baselineRefreshedAt) } catch { /* 标记失败不再报 */ }
@@ -327,7 +347,7 @@ export async function refreshIndex({
   try {
     written = writeIndexFile(path, doc, baselineRefreshedAt)
   } catch (error) {
-    log(`workflow index：${error.message}`)
+    log(`workflow index：stale，旧快照保留（${error.message}）`)
     return { status: 'stale', path, reason: error.message, mode }
   }
   if (!written) return { status: 'abandoned', path, mode }

@@ -459,7 +459,7 @@ describe("增量路径", () => {
     assert.equal(r.status, "stale");
     assert.equal(r.logs.length, 2, "先一行 501 回退说明，再一行沿用旧快照");
     assert.match(r.logs[0], /未装配（501/);
-    assert.match(r.logs[1], /^workflow index：离线沿用旧快照（HTTP 501：\/sync\/changes）$/);
+    assert.match(r.logs[1], /^workflow index：stale，旧快照保留（HTTP 501：\/sync\/changes）$/);
     assert.deepEqual(readIndex().items, seeded.items);
   });
 });
@@ -615,7 +615,7 @@ describe("离线 / 超时（退出码 0，沿用旧快照）", () => {
     const r = await run();
     assert.equal(r.status, "stale");
     assert.equal(r.logs.length, 1);
-    assert.match(r.logs[0], /^workflow index：离线沿用旧快照（网络错误：/);
+    assert.match(r.logs[0], /^workflow index：stale，旧快照保留（离线：网络错误：/);
     const doc = readIndex();
     assert.deepEqual(doc.items, seeded.items);
     assert.equal(doc.refreshedAt, seeded.refreshedAt);
@@ -627,7 +627,7 @@ describe("离线 / 超时（退出码 0，沿用旧快照）", () => {
     writeFileSync(join(home, ".config/workflow/config.toml"), '[profiles.sandbox]\nbase_url = "http://127.0.0.1:1"\ntoken = "wfp_sandbox00"\n');
     const r = await run();
     assert.equal(r.status, "stale");
-    assert.match(r.logs[0], /^workflow index：未生成（/);
+    assert.match(r.logs[0], /^workflow index：stale，未生成（/);
     assert.equal(existsSync(indexPath()), false);
   });
 
@@ -637,7 +637,7 @@ describe("离线 / 超时（退出码 0，沿用旧快照）", () => {
     // 这条专测「单请求超时」分支：只收紧单请求预算，总预算仍宽，确保报的是超时而非预算用尽
     const r = await run({ requestTimeoutMs: 300 });
     assert.equal(r.status, "stale");
-    assert.match(r.logs[0], /请求超时：\/sync\/changes/);
+    assert.match(r.logs[0], /^workflow index：stale，旧快照保留（超时：请求超时：\/sync\/changes）/);
     assert.deepEqual(readIndex().items, seeded.items);
   });
 
@@ -649,8 +649,42 @@ describe("离线 / 超时（退出码 0，沿用旧快照）", () => {
     // 预算已尽。判定只看假时钟，不看墙钟，所以并行跑也稳。
     const r = await run({ now: () => (tick += 1000), totalBudgetMs: 1500 });
     assert.equal(r.status, "stale");
-    assert.match(r.logs[0], /总预算用尽/);
+    assert.match(r.logs[0], /stale，旧快照保留（超时：总预算用尽/);
     assert.equal(readIndex().fullPulledAt, iso(NOW - FULL_INTERVAL_MS - 1000), "旧快照原样保留");
+  });
+
+  test("HTTP 401：reason 带鉴权分类，stderr 不出现 token", async () => {
+    const seeded = seedIndex();
+    handler = () => ({ status: 401, body: { title: "unauthorized" } });
+    const r = await run();
+    assert.equal(r.status, "stale");
+    assert.match(r.reason, /401/);
+    assert.match(r.logs[0], /stale，旧快照保留（401：HTTP 401/);
+    assert.doesNotMatch(r.logs.join("\n"), /wfp_/);
+    assert.deepEqual(readIndex().items, seeded.items);
+  });
+
+  test("HTTP 403：reason 带鉴权分类", async () => {
+    seedIndex();
+    handler = () => ({ status: 403, body: { title: "forbidden" } });
+    const r = await run();
+    assert.equal(r.status, "stale");
+    assert.match(r.reason, /403/);
+    assert.match(r.logs[0], /stale，旧快照保留（403：HTTP 403/);
+  });
+
+  test("已设代理变量：reason 只报名不报 URL", async () => {
+    writeFileSync(join(home, ".config/workflow/config.toml"), '[profiles.sandbox]\nbase_url = "http://127.0.0.1:1"\ntoken = "wfp_sandbox00"\n');
+    seedIndex();
+    const r = await run({
+      env: { ...env(), HTTPS_PROXY: "http://secret-proxy.example:8080" },
+    });
+    assert.equal(r.status, "stale");
+    assert.match(r.reason, /已设代理变量 HTTPS_PROXY/);
+    assert.match(r.reason, /离线/);
+    assert.doesNotMatch(r.reason, /secret-proxy/);
+    assert.doesNotMatch(r.logs.join("\n"), /secret-proxy/);
+    assert.doesNotMatch(r.logs.join("\n"), /wfp_/);
   });
 });
 
@@ -661,7 +695,7 @@ describe("命令行入口", () => {
     assert.equal(r.status, 0);
     assert.equal(r.stdout, "");
     assert.equal(r.stderr.trim().split("\n").length, 1);
-    assert.match(r.stderr, /workflow index：未生成/);
+    assert.match(r.stderr, /workflow index：stale，未生成/);
     assert.doesNotMatch(r.stderr, /wfp_/, "token 不得出现在任何输出");
   });
 

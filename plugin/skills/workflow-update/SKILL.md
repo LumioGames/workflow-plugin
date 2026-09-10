@@ -59,16 +59,31 @@ https://workflow.games/plugin/version.json?cb=<当前 epoch 秒>
 
 ## 4. 自更新流程（仅手动安装）
 
-1. 抓取 `version.json` 的 `files` 指向的文件清单（同样加 `cb` 参数）。
-2. 逐文件下载到**临时目录**（不直接写目标）。
-3. 逐一校验 **sha256**：任何一个不符 → **立即中止并报告，不落盘任何文件**。
-4. 全部通过后：把现有 `workflow-*` 技能目录改名加 **`.bak-<旧版本>`** 后缀备份，再把新文件就位。
-5. 读新 `VERSION` 确认版本已变，向用户转述 `version.json` 的 `notes`。
+手动安装走插件自带的安装器，**不要在技能扫描目录里改名备份**。先判渠道（本节只服务手动安装；宿主托管见第 2 节），不要拿另一渠道的版本号决定升/降。
+
+```
+node <插件根>/tools/workflow-install.mjs --from-dir <新版本解包根>
+# 官网（默认 --mode full）：
+node <插件根>/tools/workflow-install.mjs
+# 兼容性诊断（只打印，不删 ADR / 历史计划）：
+node <插件根>/tools/workflow-install.mjs --doctor
+```
+
+1. 抓取 `version.json` 的 `files` 指向的文件清单（同样加 `cb` 参数）。**full** 要的是运行时清单；旧 `files.json` 只有技能 Markdown → 失败并说明缺运行时，不得标已完整安装。
+2. 安装器下到**临时目录**（不直接写目标），逐一校验 **sha256**：任何一个不符 → **立即中止并报告，不落盘任何文件**。
+3. **full**（默认）：可执行文件必须命中 `runtime-manifest.json` 的 `executableGlobs`（清单内 `.mjs` / `.sh`），且 sha256 一致；不在白名单的可执行文件仍中止。
+4. **skills**：仍只允许 `.md` 与 `VERSION`；清单里出现可执行文件 → **立即中止并告警**。结束时打印能力边界（无规则/工具/reviewer）。
+5. 备份落到 `$XDG_DATA_HOME/workflow/backups/`（**不进** `~/.codex/skills`）。扫描根里已有的 `*.bak-*` 迁到 backups。
+6. 完整树换根到 `$XDG_DATA_HOME/workflow/plugin`，技能目录改为指向运行时的受管 symlink。
+7. 读新 `VERSION` 确认版本已变，向用户转述 `version.json` 的 `notes`。
+
+`--doctor` 即兼容性诊断：缺资源、断链、同名技能、入口/reviewer 缺失、lint 扩展 `api≠1`。**默认只打印**，不删 ADR / 历史计划。
 
 ## 安全边界
 
-- **只从 `workflow.games` 域下载**。清单里出现任何其他域的地址 → 中止并告警。
-- 技能包只应包含 **`.md` 与 `VERSION` 纯文本**。清单或下载内容里发现可执行文件（`.sh`、二进制等）→ **立即中止并告警**，不安装。
+- **只从 `workflow.games` 域下载**（或本地 `--from-dir`）。清单里出现任何其他域的地址 → 中止并告警。
+- **技能渠道**（`--mode skills` / 旧包）只应包含 **`.md` 与 `VERSION` 纯文本**。清单或下载内容里发现可执行文件（`.sh`、二进制等）→ **立即中止并告警**，不安装。
+- **完整运行时**（`--mode full`）允许清单白名单内的 `.mjs`；不在 `executableGlobs` 里的可执行文件仍中止、不落盘。
 - 宿主托管形态（第 2 节）**不下载任何文件**——它只调用宿主自己的命令，下载与落盘都由宿主负责。
 - 更新**绝不触碰** `~/.config/workflow/config.toml`——凭证与插件更新无关；同样不得覆盖或删除
   项目的 `.workflow-policy`、`.workflow-drafts/`（包括未完成的本地 bundle）。更新插件后若发现

@@ -16,10 +16,10 @@
 
 | 能力 | Claude Code | Codex / 其他客户端 |
 |------|-------------|--------------------|
-| 规则常驻 | SessionStart hook 每次会话注入 `rules/` 与索引一行 | **无钩子**——靠项目 `AGENTS.md` 的「通用规则在插件 `rules/`」指针主动读 |
-| 索引刷新 | SessionStart hook 自动（15 分钟内不重拉） | 手动跑 `tools/refresh-index.mjs` |
+| 规则常驻 | SessionStart hook 每次会话注入 `rules/` 与索引一行 | **无钩子**——靠用户级 `~/.codex/AGENTS.md` 哨兵块主动读运行时 `rules/`（技能发现不会加载规则） |
+| 索引刷新 | SessionStart hook 自动（15 分钟内不重拉） | 手动跑 `tools/refresh-index.mjs`；索引带 `stale` 不算成功 |
 | 技能加载 | 插件自动发现，按 `workflow:<name>` 调用 | 按 Agent Plugins 标准发现 `skills/` |
-| 子 Agent | 插件 `agents/` 自动发现 | **无**——主 loop 手动读 `agents/reviewer.md` 本地对抗审查；同上下文自审丧失「写 ≠ 审」独立性，属已知降级 |
+| 子 Agent | 插件 `agents/` 自动发现 | 有 `~/.codex/agents/*.toml`（本插件写 `workflow_reviewer.toml`）。`sandbox_mode = "read-only"` 是**默认值，不是不可覆盖的边界**；Claude 的 `disallowedTools` 对 Codex 无效。无 toml 时主 loop 读 `agents/reviewer.md`，同上下文自审丧失「写 ≠ 审」独立性 |
 | worktree 隔离 | Agent 工具 `isolation: "worktree"` | `git worktree add`；无对应物时并行退化为串行 |
 | 任务真值 | Workflow 单（宿主内置任务工具只作个人草稿） | 同左 |
 

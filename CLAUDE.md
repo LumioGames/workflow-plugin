@@ -8,4 +8,4 @@
 - **开发面 = 仓库根**：`tests/`、`package.json`、`.github/`、`CHANGELOG.md` —— **一律不下发**。
   往 `plugin/` 里放开发过程文件会被 `plugin-lint` 的「发布面隔离」检查拦下。
 
-通用调度与编码规程在 [`plugin/rules/`](plugin/rules/)，由 SessionStart hook 每次会话注入。
+通用调度与编码规程在 [`plugin/rules/`](plugin/rules/)，由 SessionStart hook 每次会话注入；无钩子的宿主请主动读 `plugin/rules/`。

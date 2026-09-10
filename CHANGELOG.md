@@ -2,6 +2,20 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.0]
+
+Codex 完整运行时安装：默认 full、备份离开技能扫描目录、宿主适配入口，以及索引 stale 诊断。
+
+### Codex 完整运行时
+
+- 新增 `tools/workflow-install.mjs` 与 `bin/install.sh`：默认 `--mode full`，可执行文件走 `runtime-manifest.json` 白名单并现场算 sha256；旧官网 `files.json`（只有技能 Markdown）不能再被标成完整安装。
+- 完整树落到 `$XDG_DATA_HOME/workflow/plugin`，旧树 rename 到 `$XDG_DATA_HOME/workflow/backups/`，**不再**在 `~/.codex/skills/*.bak-*` 备份。技能目录改为指向运行时的受管 symlink。
+- 用户级 `~/.codex/AGENTS.md` 只维护哨兵块；Codex reviewer 适配在 `hosts/codex/workflow_reviewer.toml`（`sandbox_mode = "read-only"` 是默认值，不是不可覆盖边界）。`--doctor` 只打印兼容性诊断，不删 ADR / 历史计划。
+
+### 索引诊断
+
+- `refresh-index` 失败 reason 区分超时 / 离线 / 已设代理变量名 / 401·403；stderr 写明 stale、旧快照保留。不报代理 URL、不报 token。
+
 ## [1.2.0]
 
 第二轮收敛：**修掉插件自相矛盾的指令、把只读做成能力边界、让便利功能不再能干掉硬规则。**

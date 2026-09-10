@@ -130,9 +130,17 @@ describe("安全边界不得放宽", () => {
     assert.match(safety, /只从\s*`?workflow\.games`?\s*域下载/);
   });
 
-  test("技能包只允许 Markdown 与 VERSION，遇可执行文件中止", () => {
+  test("技能渠道仍只允许 Markdown 与 VERSION，遇可执行文件中止", () => {
+    assert.match(safety, /技能渠道/);
     assert.match(safety, /`\.md`\s*与\s*`VERSION`/);
     assert.match(safety, /立即中止并告警/);
+  });
+
+  test("完整运行时允许清单内的 .mjs，不在白名单的可执行文件仍中止", () => {
+    assert.match(safety, /完整运行时/);
+    assert.match(safety, /executableGlobs|白名单/);
+    assert.match(safety, /`\.mjs`/);
+    assert.match(safety, /不落盘/);
   });
 
   test("不触碰凭证文件", () => {
@@ -156,5 +164,13 @@ describe("命令入口与技能同口径", () => {
         "commands/update.md 里分流必须写在 version.json 之前——命令与技能次序不一致会让 Agent 按旧序执行",
       );
     }
+  });
+
+  test("手动安装走安装器，备份不进 skills，full 允许清单内可执行文件", () => {
+    assert.match(command, /workflow-install/);
+    assert.match(skill, /backups/);
+    assert.match(skill, /不进/);
+    assert.match(skill, /executableGlobs|白名单/);
+    assert.match(skill, /--doctor/);
   });
 });
