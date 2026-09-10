@@ -85,7 +85,7 @@ describe('--from-dir 首装 / 重装', () => {
     const state = readState()
     assert.equal(state.channel, 'local')
     assert.equal(state.mode, 'full')
-    assert.equal(state.version, '1.3.0')
+    assert.equal(state.version, JSON.parse(readFileSync(join(pluginRoot, 'plugin.json'), 'utf8')).version)
     assert.ok(Array.isArray(state.files) && state.files.length > 0)
     assert.match(readFileSync(layout.agentsMd, 'utf8'), new RegExp(MANAGED_BEGIN))
     assert.match(readFileSync(layout.reviewerToml, 'utf8'), /managed-by: workflow-plugin/)
