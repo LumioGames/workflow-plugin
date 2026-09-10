@@ -47,6 +47,7 @@ import {
   isSkillsTextFile,
   isSymlinkTo,
   isTextAllowed,
+  listPluginRuleFiles,
   listRuntimeFiles,
   loadRuntimeManifest,
   matchGlob,
@@ -183,6 +184,19 @@ function writeCodexAdapter(layout, pluginRoot) {
   return { reviewerSkipped: false }
 }
 
+/** 已是指向 target 的受管 symlink 则保留；用户自有普通文件不覆盖；其余（错链 / 目录）换成 symlink。 */
+function linkManaged(dest, target) {
+  if (existsSync(dest)) {
+    if (isSymlinkTo(dest, target)) return 'kept'
+    const st = lstatSync(dest)
+    if (!st.isSymbolicLink() && !st.isDirectory()) return 'skipped'
+    rmrf(dest)
+  }
+  ensureDir(dirname(dest))
+  symlinkSync(target, dest)
+  return 'linked'
+}
+
 function linkSkills(pluginRoot, skillsTarget) {
   const srcSkills = join(pluginRoot, 'skills')
   if (!existsSync(srcSkills)) fail('源里没有 skills/')
@@ -192,20 +206,46 @@ function linkSkills(pluginRoot, skillsTarget) {
     if (!isOurSkillDir(name)) continue
     const dest = join(skillsTarget, name)
     const target = join(srcSkills, name)
-    if (existsSync(dest)) {
-      if (isSymlinkTo(dest, target)) {
-        installed.push(name)
-        continue
-      }
-      const st = lstatSync(dest)
-      if (!st.isSymbolicLink() && !st.isDirectory()) {
-        // 非目录的外来文件不覆盖
-        continue
-      }
-      rmrf(dest)
-    }
-    symlinkSync(target, dest)
+    if (linkManaged(dest, target) === 'skipped') continue
     installed.push(name)
+  }
+  return installed
+}
+
+function ruleLinkDirs(layout) {
+  const dirs = []
+  const seen = new Set()
+  const fallback = layout.home ? join(layout.home, '.agents', 'rules') : null
+  for (const dir of [layout.rulesTarget || fallback, layout.projectRulesTarget]) {
+    if (!dir) continue
+    const key = resolve(dir)
+    if (seen.has(key)) continue
+    seen.add(key)
+    dirs.push(dir)
+  }
+  return dirs
+}
+
+function linkRules(pluginRoot, rulesTarget) {
+  const names = listPluginRuleFiles(pluginRoot)
+  if (!names.length) return []
+  ensureDir(rulesTarget)
+  const installed = []
+  for (const name of names) {
+    const dest = join(rulesTarget, name)
+    const target = join(pluginRoot, 'rules', name)
+    if (linkManaged(dest, target) === 'skipped') continue
+    installed.push(name)
+  }
+  return installed
+}
+
+function linkRuleTargets(pluginRoot, layout) {
+  const installed = []
+  for (const dir of ruleLinkDirs(layout)) {
+    for (const name of linkRules(pluginRoot, dir)) {
+      installed.push({ dir, name })
+    }
   }
   return installed
 }
@@ -279,6 +319,7 @@ export function applyFromSource({
   rmrf(layout.stagingDir)
 
   const installedSkills = linkSkills(layout.pluginDir, layout.skillsTarget)
+  const installedRules = mode === 'full' ? linkRuleTargets(layout.pluginDir, layout) : []
   const { moved } = migrateDiscoveryBackups(layout, { now })
   let adapter = { reviewerSkipped: true }
   if (mode === 'full' && hostKindFromSkillsTarget(layout.skillsTarget) === 'codex') {
@@ -295,12 +336,13 @@ export function applyFromSource({
     installedAt: now().toISOString(),
     pluginDir: layout.pluginDir,
     skillsTarget: layout.skillsTarget,
+    rulesTarget: layout.rulesTarget || (layout.home ? join(layout.home, '.agents', 'rules') : null),
     files: hashes,
     backupId: previous ? previous.split(/[\\/]/).pop() : null,
     reviewerSkipped: adapter.reviewerSkipped,
   }
   writeJson(layout.statePath, state)
-  return { ...state, installedSkills, backup: previous ? { id: state.backupId, dir: previous } : null, migratedBackups: moved }
+  return { ...state, installedSkills, installedRules, backup: previous ? { id: state.backupId, dir: previous } : null, migratedBackups: moved }
 }
 
 export async function stageFromManifest({
@@ -515,6 +557,7 @@ export function rollback(layout, { id } = {}) {
   moveDir(dir, layout.pluginDir)
   linkSkills(layout.pluginDir, layout.skillsTarget)
   const mode = detectMode(layout.pluginDir)
+  if (mode === 'full') linkRuleTargets(layout.pluginDir, layout)
   if (mode === 'full' && hostKindFromSkillsTarget(layout.skillsTarget) === 'codex') {
     writeCodexAdapter(layout, layout.pluginDir)
   }
@@ -546,6 +589,8 @@ function layoutFromArgs(args, env = process.env) {
     dataDir: args['data-dir'],
     codexHome: args['codex-home'],
     skillsTarget: args.target || args['skills-target'],
+    rulesTarget: args['rules-target'],
+    projectRoot: args.project,
   })
 }
 

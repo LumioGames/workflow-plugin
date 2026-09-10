@@ -2,7 +2,7 @@
  * 手动安装渠道的路径、清单与版本布局。workflow-install.mjs 的数据面。
  *
  * 两种档：skills = 只装技能 Markdown + VERSION；full = 整份 plugin/ 运行时。
- * 备份永远在 dataDir/backups/，不进技能扫描目录。
+ * 备份永远在 dataDir/backups/，不进技能扫描目录，也不进 .agents/rules/。
  */
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync } from 'node:fs'
@@ -38,24 +38,39 @@ export function defaultCodexHome({ env = process.env, home = homedir() } = {}) {
   return env.CODEX_HOME?.trim() || join(home, '.codex')
 }
 
+export function projectRootFromSkillsTarget(skillsTarget) {
+  if (!skillsTarget) return null
+  const n = String(skillsTarget).split(sep).join('/')
+  if (n.endsWith('/.agents/skills')) return resolve(skillsTarget, '..', '..')
+  return null
+}
+
 export function resolveLayout({
   env = process.env,
   home = homedir(),
   dataDir,
   codexHome,
   skillsTarget,
+  rulesTarget,
+  projectRoot,
 } = {}) {
   const data = resolve(dataDir || defaultDataDir({ env, home }))
   const codex = resolve(codexHome || defaultCodexHome({ env, home }))
+  const homeDir = resolve(home)
+  const skills = resolve(skillsTarget || join(codex, 'skills'))
+  const inferredProject = projectRoot ? resolve(projectRoot) : projectRootFromSkillsTarget(skills)
   return {
-    home: resolve(home),
+    home: homeDir,
     dataDir: data,
     pluginDir: join(data, 'plugin'),
     backupsDir: join(data, 'backups'),
     statePath: join(data, 'state.json'),
     stagingDir: join(data, '.staging'),
     codexHome: codex,
-    skillsTarget: resolve(skillsTarget || join(codex, 'skills')),
+    skillsTarget: skills,
+    rulesTarget: resolve(rulesTarget || join(homeDir, '.agents', 'rules')),
+    projectRoot: inferredProject,
+    projectRulesTarget: inferredProject ? join(inferredProject, '.agents', 'rules') : null,
     agentsDir: join(codex, 'agents'),
     agentsMd: join(codex, 'AGENTS.md'),
     agentsOverrideMd: join(codex, 'AGENTS.override.md'),
@@ -63,6 +78,15 @@ export function resolveLayout({
     configToml: join(home, '.config', 'workflow', 'config.toml'),
     policyToml: join(home, '.config', 'workflow', 'policy.toml'),
   }
+}
+
+/** 与 inject-rules.mjs 同一集合：rules/*.md，排除 README.md 与点文件。 */
+export function listPluginRuleFiles(pluginRoot) {
+  const rulesDir = join(pluginRoot, 'rules')
+  if (!existsSync(rulesDir)) return []
+  return readdirSync(rulesDir)
+    .filter((n) => n.endsWith('.md') && n !== 'README.md' && !n.startsWith('.'))
+    .sort()
 }
 
 export function loadRuntimeManifest(pluginRoot) {
@@ -290,6 +314,7 @@ Plugin root: \`${pluginRoot}\`. Before acting in a Workflow workspace, read:
 - \`${pluginRoot}/rules/system.md\`
 - \`${pluginRoot}/rules/dispatch.md\`
 
+Hosts that scan \`~/.agents/rules/\` load managed symlinks to these files.
 Skill discovery in \`${skillsTarget}\` does **not** load these rules. Also read the
 project's \`.spec/AGENTS.md\` when it exists — it is not loaded by skill discovery.
 
