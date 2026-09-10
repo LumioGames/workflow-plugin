@@ -99,7 +99,7 @@ describe('frontmatter', () => {
     assert.doesNotMatch(out, /未登记进 knowledge\/README\.md/)
   })
 
-  test('默认配置对 LumioGameEngine 风格不误报:plans 完整 frontmatter + ADR 用 Accepted', async () => {
+  test('默认配置对「plans 带完整 frontmatter + ADR 用 Accepted」的项目风格不误报', async () => {
     const root = specFixture({
       '.spec/plans/2026-09-10-x.md': '---\nname: 2026-09-10-x\ndescription: 派活提示词\nmetadata:\n  type: doc\n  status: 设计中\n---\n\n# x\n',
     })

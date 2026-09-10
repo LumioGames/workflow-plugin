@@ -118,23 +118,53 @@ function seedIndex(overrides = {}) {
 
 const ROOMS = { items: [{ id: "room-1", displayKey: "RM-00001", name: "Room 1" }, { id: "room-2", displayKey: "RM-00002", name: "Room 2" }] };
 
+// 打桩必须照冻结合同的真实 wire 形状：八个字段 required、**永远显式出现**（含空串），没有
+// description。空串是有意义的值——roomId 空串 = 未归属需求室，deletedAt 空串 = 活着（非空才是墓碑）。
+// 早先这里用 `deletedAt: null` 打桩，把「空串也是假值」这条运行时判定的前提悄悄换掉了。
+const change = (over) => ({
+  type: "requirement",
+  id: "01930000-0000-7000-8000-000000000000",
+  displayKey: "R-00000",
+  roomId: "",
+  title: "",
+  status: "todo",
+  updatedAt: "2026-09-10T11:00:00.000Z",
+  deletedAt: "",
+  ...over,
+});
+
+const FULL_SERVER_TIME = "2026-09-10T11:58:00.000Z";
+
+// 全量打桩：/rooms 只为拿 Room 名字映射，随后 /sync/changes **不带 updatedSince** 一次给全三类。
 function fullHandler(url) {
   if (url.pathname === "/api/v1/rooms") return { body: ROOMS };
-  if (url.pathname === "/api/v1/requirements") {
-    const roomId = url.searchParams.get("roomId");
+  if (url.pathname === "/api/v1/sync/changes") {
+    if (url.searchParams.has("updatedSince")) return { status: 500, body: { title: "全量不得带 updatedSince" } };
     const cursor = url.searchParams.get("cursor");
-    if (roomId === "room-1" && !cursor) {
-      return { body: { items: [{ displayKey: "R-00001", title: "一", status: "s1", updatedAt: "2026-09-10T11:00:00Z" }], nextCursor: "page2" } };
+    if (!cursor) {
+      return { body: { serverTime: FULL_SERVER_TIME, nextCursor: "page2", items: [
+        change({ id: "u1", displayKey: "R-00001", roomId: "room-1", title: "一", status: "s1" }),
+        change({ type: "work_item", id: "t1", displayKey: "T-00001", roomId: "room-1", title: "子任务", status: "todo" }),
+      ] } };
     }
-    if (roomId === "room-1" && cursor === "page2") {
-      return { body: { items: [{ displayKey: "R-00002", title: "二", status: "s1", updatedAt: "2026-09-10T11:00:00Z" }], nextCursor: "" } };
-    }
-    if (roomId === "room-2") {
-      return { body: { items: [{ displayKey: "R-00003", title: "三", status: "s2", updatedAt: "2026-09-10T11:00:00Z" }], nextCursor: "" } };
+    if (cursor === "page2") {
+      return { body: { serverTime: FULL_SERVER_TIME, nextCursor: "", items: [
+        change({ id: "u2", displayKey: "R-00002", roomId: "room-1", title: "二", status: "s1" }),
+        change({ id: "u3", displayKey: "R-00003", roomId: "room-2", title: "三", status: "s2" }),
+        // roomId 空串 = 未归属需求室：必须落成 room: null，且不得触发重拉 Room 列表。
+        change({ type: "bug", id: "b1", displayKey: "B-00001", roomId: "", title: "缺陷", status: "todo" }),
+      ] } };
     }
   }
   return { status: 500, body: { title: `unexpected ${url.pathname}` } };
 }
+
+// 增量（带 updatedSince）返指定错误码，全量（不带）照常拉——真实服务端就是这个分野：
+// 410 只对过期水位成立，不带水位的全量请求照样有结果。
+const incrementalFails = (status, title) => (url) =>
+  url.pathname === "/api/v1/sync/changes" && url.searchParams.has("updatedSince")
+    ? { status, body: { title } }
+    : fullHandler(url);
 
 describe("凭证解析（不回落 current_profile）", () => {
   test(".workflow 缺失：不拉、不写文件、不警告", async () => {
@@ -188,7 +218,7 @@ describe("凭证解析（不回落 current_profile）", () => {
 });
 
 describe("全量路径", () => {
-  test("首次无快照：Room 列表 + 逐 Room 需求摘要，cursor 翻到空；写出规格字段", async () => {
+  test("首次无快照：Room 列表 + /sync/changes 不带 updatedSince，cursor 翻到空；写出规格字段", async () => {
     handler = fullHandler;
     const r = await run();
     assert.equal(r.status, "refreshed");
@@ -200,31 +230,56 @@ describe("全量路径", () => {
     assert.equal(doc.host, "127.0.0.1");
     assert.equal(doc.refreshedAt, iso(NOW));
     assert.equal(doc.fullPulledAt, iso(NOW));
-    assert.ok(Date.parse(doc.serverTime) > 0, "serverTime 应是 ISO 时间");
+    assert.equal(doc.serverTime, FULL_SERVER_TIME, "水位取响应 serverTime（首页取样）");
     assert.deepEqual(doc.rooms, { "RM-00001": { id: "room-1", name: "Room 1" }, "RM-00002": { id: "room-2", name: "Room 2" } });
-    assert.deepEqual(Object.keys(doc.items).sort(), ["R-00001", "R-00002", "R-00003"]);
-    assert.deepEqual(doc.items["R-00003"], { type: "requirement", room: "RM-00002", title: "三", status: "s2", updatedAt: "2026-09-10T11:00:00Z" });
+    assert.deepEqual(Object.keys(doc.items).sort(), ["B-00001", "R-00001", "R-00002", "R-00003", "T-00001"]);
+    assert.deepEqual(doc.items["R-00003"], { type: "requirement", room: "RM-00002", title: "三", status: "s2", updatedAt: "2026-09-10T11:00:00.000Z" });
 
-    // Room 之间并发，到达顺序不固定：只断言集合与每个请求的形状
     assert.equal(calls[0].path, "/api/v1/rooms");
     assert.equal(calls[0].query.limit, "50");
-    const reqCalls = calls.slice(1);
-    assert.equal(reqCalls.length, 3);
-    assert.ok(reqCalls.every((c) => c.path === "/api/v1/requirements" && c.query.view === "summary" && c.query.limit === "250"));
-    assert.deepEqual(
-      reqCalls.map((c) => `${c.query.roomId}:${c.query.cursor ?? ""}`).sort(),
-      ["room-1:", "room-1:page2", "room-2:"],
-    );
+    const syncCalls = calls.slice(1);
+    assert.equal(syncCalls.length, 2, "两页：首页 + cursor=page2");
+    assert.ok(syncCalls.every((c) => c.path === "/api/v1/sync/changes"));
+    assert.ok(syncCalls.every((c) => c.query.types === "requirement,work_item,bug" && c.query.limit === "250"));
+    assert.ok(syncCalls.every((c) => !("updatedSince" in c.query)), "全量必须省略 updatedSince");
+    assert.deepEqual(syncCalls.map((c) => c.query.cursor ?? ""), ["", "page2"]);
+    assert.equal(calls.some((c) => c.path === "/api/v1/requirements"), false, "全量不再逐 Room 拉 /requirements");
     assert.ok(calls.every((c) => c.auth === "Bearer wfp_sandbox00"), "必须带所选 profile 的 token，而非 current_profile 的");
   });
 
-  test("fullPulledAt 超过 24 h：即使有快照也走全量对齐", async () => {
+  test("全量快照同时含 requirement / work_item / bug 三类，roomId 空串落成 room: null", async () => {
+    // D 的核心：全量与增量走同一端点，覆盖集合才一致。逐 Room 拉 /requirements 的旧全量只拿得到
+    // 需求，工作项与缺陷根本进不了索引——而索引的设计口径是「需求 / 工作项 / 缺陷」三类都在。
     handler = fullHandler;
-    seedIndex({ fullPulledAt: iso(NOW - FULL_INTERVAL_MS - 1000) });
+    await run();
+    const doc = readIndex();
+    assert.deepEqual(
+      [...new Set(Object.values(doc.items).map((i) => i.type))].sort(),
+      ["bug", "requirement", "work_item"],
+    );
+    assert.deepEqual(doc.items["T-00001"], { type: "work_item", room: "RM-00001", title: "子任务", status: "todo", updatedAt: "2026-09-10T11:00:00.000Z" });
+    assert.deepEqual(doc.items["B-00001"], { type: "bug", room: null, title: "缺陷", status: "todo", updatedAt: "2026-09-10T11:00:00.000Z" });
+    assert.equal(calls.filter((c) => c.path === "/api/v1/rooms").length, 1, "roomId 空串不得触发重拉 Room 列表");
+  });
+
+  test("fullPulledAt 超过 24 h：全量对齐不把增量带进来的工作项 / 缺陷冲掉", async () => {
+    // 旧全量只回需求，于是每 24 h 一次的对齐会把增量攒下的 T- / B- 整片抹掉；同端点全量后不会了。
+    handler = fullHandler;
+    seedIndex({
+      fullPulledAt: iso(NOW - FULL_INTERVAL_MS - 1000),
+      items: {
+        "R-00001": { type: "requirement", room: "RM-00001", title: "旧标题", status: "s0", updatedAt: "2026-09-10T10:00:00Z" },
+        "T-00001": { type: "work_item", room: "RM-00001", title: "增量带进来的工作项", status: "s0", updatedAt: "2026-09-10T10:00:00Z" },
+        "B-00001": { type: "bug", room: "RM-00001", title: "增量带进来的缺陷", status: "s0", updatedAt: "2026-09-10T10:00:00Z" },
+      },
+    });
     const r = await run();
     assert.equal(r.mode, "full");
     assert.equal(calls[0].path, "/api/v1/rooms");
-    assert.deepEqual(Object.keys(readIndex().items).sort(), ["R-00001", "R-00002", "R-00003"]);
+    const doc = readIndex();
+    assert.deepEqual(Object.keys(doc.items).sort(), ["B-00001", "R-00001", "R-00002", "R-00003", "T-00001"]);
+    assert.equal(doc.items["T-00001"].type, "work_item");
+    assert.equal(doc.items["B-00001"].type, "bug");
   });
 });
 
@@ -240,9 +295,9 @@ describe("增量路径", () => {
             serverTime: "2026-09-10T11:59:00.000Z",
             nextCursor: "c2",
             items: [
-              { type: "requirement", id: "u1", displayKey: "R-00001", roomId: "room-1", title: "新标题", status: "s9", updatedAt: "2026-09-10T11:30:00Z", deletedAt: null },
-              { type: "requirement", id: "u1", displayKey: "R-00001", roomId: "room-1", title: "更旧的", status: "s0", updatedAt: "2026-09-10T09:00:00Z", deletedAt: null },
-              { type: "requirement", id: "u2", displayKey: "R-00002", roomId: "room-1", title: "会被删", status: "s0", updatedAt: "2026-09-10T11:40:00Z", deletedAt: "2026-09-10T11:40:00Z" },
+              change({ id: "u1", displayKey: "R-00001", roomId: "room-1", title: "新标题", status: "s9", updatedAt: "2026-09-10T11:30:00Z" }),
+              change({ id: "u1", displayKey: "R-00001", roomId: "room-1", title: "更旧的", status: "s0", updatedAt: "2026-09-10T09:00:00Z" }),
+              change({ id: "u2", displayKey: "R-00002", roomId: "room-1", title: "会被删", status: "s0", updatedAt: "2026-09-10T11:40:00Z", deletedAt: "2026-09-10T11:40:00Z" }),
             ],
           },
         };
@@ -252,7 +307,7 @@ describe("增量路径", () => {
           serverTime: "2026-09-10T11:59:00.000Z",
           nextCursor: "",
           items: [
-            { type: "bug", id: "b1", displayKey: "B-00007", roomId: "room-1", title: "新缺陷", status: "open-ish", updatedAt: "2026-09-10T11:50:00Z", deletedAt: null },
+            change({ type: "bug", id: "b1", displayKey: "B-00007", roomId: "room-1", title: "新缺陷", status: "open-ish", updatedAt: "2026-09-10T11:50:00Z" }),
           ],
         },
       };
@@ -268,6 +323,10 @@ describe("增量路径", () => {
     assert.equal(calls[0].query.updatedSince, iso(Date.parse(seeded.serverTime) - 60_000));
     assert.equal(calls[0].query.types, "requirement,work_item,bug");
     assert.equal(calls[1].query.cursor, "c2");
+    // 游标绑定 updatedSince / types / roomId：翻页时三者与首页不一致就是 422。
+    assert.equal(calls[1].query.updatedSince, calls[0].query.updatedSince, "翻页的 updatedSince 必须与首页逐字一致");
+    assert.equal(calls[1].query.types, calls[0].query.types, "翻页的 types 必须与首页逐字一致");
+    assert.ok(calls.every((c) => !("roomId" in c.query)), "不得按 Room 拉：被移出某室的对象不会出现在该室的增量里");
 
     const doc = readIndex();
     assert.equal(doc.serverTime, "2026-09-10T11:59:00.000Z");
@@ -276,6 +335,45 @@ describe("增量路径", () => {
     assert.deepEqual(doc.items["R-00001"], { type: "requirement", room: "RM-00001", title: "新标题", status: "s9", updatedAt: "2026-09-10T11:30:00Z" });
     assert.equal("R-00002" in doc.items, false, "deletedAt 非空必须删键");
     assert.deepEqual(doc.items["B-00007"], { type: "bug", room: "RM-00001", title: "新缺陷", status: "open-ish", updatedAt: "2026-09-10T11:50:00Z" });
+  });
+
+  test("每页都带 limit=250：不让服务端按默认 100 分页把总预算翻完", async () => {
+    seedIndex();
+    handler = (url) => {
+      if (url.pathname !== "/api/v1/sync/changes") return { status: 500, body: {} };
+      const cursor = url.searchParams.get("cursor");
+      return { body: { serverTime: "2026-09-10T11:59:00.000Z", nextCursor: cursor ? "" : "c2", items: [] } };
+    };
+    const r = await run();
+    assert.equal(r.status, "refreshed");
+    assert.equal(calls.length, 2);
+    assert.ok(calls.every((c) => c.query.limit === "250"), "首页与翻页都要带 limit=250");
+  });
+
+  test("deletedAt 空串 = 活着，绝不当墓碑；roomId 空串 = 未归属需求室", async () => {
+    // 八个字段永远显式出现，空串是有意义的值。曾经用 `deletedAt: null` 打桩，掩盖了「空串也是假值」
+    // 这条前提——若哪天把运行时判定改成 `!= null`，真实响应里每个活对象都会被当成已删而整片清空。
+    seedIndex();
+    handler = (url) => {
+      if (url.pathname !== "/api/v1/sync/changes") return { status: 500, body: {} };
+      return {
+        body: {
+          serverTime: "2026-09-10T11:59:00.000Z",
+          nextCursor: "",
+          items: [
+            change({ id: "u1", displayKey: "R-00001", roomId: "room-1", title: "活着", status: "s9", updatedAt: "2026-09-10T11:30:00Z", deletedAt: "" }),
+            change({ type: "work_item", id: "t9", displayKey: "T-00009", roomId: "", title: "未归属室", status: "todo", updatedAt: "2026-09-10T11:31:00Z", deletedAt: "" }),
+          ],
+        },
+      };
+    };
+    const r = await run();
+    assert.equal(r.status, "refreshed");
+    const doc = readIndex();
+    assert.equal("R-00001" in doc.items, true, "deletedAt 空串不得被当成墓碑删键");
+    assert.equal(doc.items["R-00001"].title, "活着");
+    assert.deepEqual(doc.items["T-00009"], { type: "work_item", room: null, title: "未归属室", status: "todo", updatedAt: "2026-09-10T11:31:00Z" });
+    assert.deepEqual(calls.map((c) => c.path), ["/api/v1/sync/changes"], "roomId 空串不得触发重拉 Room 列表");
   });
 
   test("变更里出现未知 Room：只重拉一次 Room 列表补映射", async () => {
@@ -288,8 +386,8 @@ describe("增量路径", () => {
             serverTime: "2026-09-10T11:59:00.000Z",
             nextCursor: "",
             items: [
-              { type: "requirement", id: "x", displayKey: "R-00010", roomId: "room-2", title: "新室的单", status: "s", updatedAt: "2026-09-10T11:50:00Z" },
-              { type: "requirement", id: "y", displayKey: "R-00011", roomId: "room-2", title: "同室第二张", status: "s", updatedAt: "2026-09-10T11:51:00Z" },
+              change({ id: "x", displayKey: "R-00010", roomId: "room-2", title: "新室的单", status: "s", updatedAt: "2026-09-10T11:50:00Z" }),
+              change({ id: "y", displayKey: "R-00011", roomId: "room-2", title: "同室第二张", status: "s", updatedAt: "2026-09-10T11:51:00Z" }),
             ],
           },
         };
@@ -307,7 +405,7 @@ describe("增量路径", () => {
 
   test("增量返 410（水位早于墓碑保留期）：静默回退全量", async () => {
     seedIndex();
-    handler = (url) => (url.pathname === "/api/v1/sync/changes" ? { status: 410, body: { title: "gone" } } : fullHandler(url));
+    handler = incrementalFails(410, "gone");
     const r = await run();
     assert.equal(r.status, "refreshed");
     assert.equal(r.mode, "full");
@@ -318,11 +416,38 @@ describe("增量路径", () => {
 
   test("增量返 404（端点未上线）：回退全量并在 stderr 留一行", async () => {
     seedIndex();
-    handler = (url) => (url.pathname === "/api/v1/sync/changes" ? { status: 404, body: { title: "not found" } } : fullHandler(url));
+    handler = incrementalFails(404, "not found");
     const r = await run();
     assert.equal(r.status, "refreshed");
     assert.equal(r.mode, "full");
     assert.deepEqual(r.logs, ["workflow index：增量端点 /sync/changes 未上线（404），回退全量"]);
+  });
+
+  test("增量返 501（demo 项目 / 业务库租户未装配）：与 404 同等对待，回退全量并留一行", async () => {
+    // 501 曾落进「未知错误」分支：标 stale、沿用旧快照。首次会话没有旧快照，于是这类 host 上
+    // 索引永远建不起来——而全量路径本来跑得通。
+    seedIndex();
+    handler = incrementalFails(501, "not implemented");
+    const r = await run();
+    assert.equal(r.status, "refreshed");
+    assert.equal(r.mode, "full");
+    assert.deepEqual(r.logs, ["workflow index：增量端点 /sync/changes 未装配（501：demo 项目或业务库租户），回退全量"]);
+    assert.equal(readIndex().fullPulledAt, iso(NOW), "回退的是真全量，不是标 stale 沿用旧快照");
+  });
+
+  test("整个 /sync/changes 都返 501：不当未知错误，stale 的 reason 指明 501，旧快照原样保留", async () => {
+    // 全量与增量现在是同一个端点：真的整片未装配时回退也救不回来。此时唯一正确的结果是
+    // 一行可诊断的 stderr + 旧快照不动，而不是把「501」混进「网络错误」里。
+    const seeded = seedIndex();
+    handler = (url) => (url.pathname === "/api/v1/sync/changes"
+      ? { status: 501, body: { type: "urn:gameflow:problem:not-implemented" } }
+      : fullHandler(url));
+    const r = await run();
+    assert.equal(r.status, "stale");
+    assert.equal(r.logs.length, 2, "先一行 501 回退说明，再一行沿用旧快照");
+    assert.match(r.logs[0], /未装配（501/);
+    assert.match(r.logs[1], /^workflow index：离线沿用旧快照（HTTP 501：\/sync\/changes）$/);
+    assert.deepEqual(readIndex().items, seeded.items);
   });
 });
 
@@ -438,6 +563,6 @@ describe("命令行入口", () => {
     assert.equal(r.stderr, "");
     assert.ok(existsSync(indexPath()));
     assert.equal(existsSync(join(repoRoot, "workflow")), false);
-    assert.deepEqual(Object.keys(readIndex().items).sort(), ["R-00001", "R-00002", "R-00003"]);
+    assert.deepEqual(Object.keys(readIndex().items).sort(), ["B-00001", "R-00001", "R-00002", "R-00003", "T-00001"]);
   });
 });

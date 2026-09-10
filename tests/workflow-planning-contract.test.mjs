@@ -266,7 +266,10 @@ test("规划 Skill 只含公开 Markdown、相对链接有效且不泄露内部�
     const displayPath = relative(repoRoot, absolutePath);
     assert.equal(extname(absolutePath), ".md", `${displayPath} 不是 Markdown`);
     const content = readFileSync(absolutePath, "utf8");
-    assert.doesNotMatch(content, /\.spec\/|LumioGameWorkFlow|localhost|wfp_[0-9a-z_-]{12,}/i, `${displayPath} 含内部路径或疑似凭据`);
+    // 与 tests/workflow-qa-contract.test.mjs 的脱敏禁令同一口径：`.spec/` 已移出禁令——它是本插件
+    // 公开发布的项目脚手架约定（/workflow:init 生成、/workflow:lint 校验），不再是内部私有路径。
+    // 内部仓名与凭据的禁令一条不减。
+    assert.doesNotMatch(content, /LumioGameWorkFlow|localhost|wfp_[0-9a-z_-]{12,}/i, `${displayPath} 含内部项目名或疑似凭据`);
     assert.doesNotMatch(content, /TBD|TODO|适当处理/, `${displayPath} 含未决占位`);
 
     for (const match of content.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
