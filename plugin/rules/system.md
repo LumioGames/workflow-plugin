@@ -1,14 +1,11 @@
 # System Rules（系统规则 · 每次会话强制在场）
 
-本文件由 Workflow 插件的 SessionStart hook **在每次会话开始时注入上下文**——始终在场的通用硬红线，不走渐进式披露。项目专属红线写在项目自己的 `.spec/rules/system.md`；**项目不得复制本文件任何一段**（`/workflow:lint` 的指纹检查会把「项目抄插件」报出来）。
-只写「**必须 / 只能 / 不得**」。「怎么做」在 [`dispatch.md`](dispatch.md) 与各技能；「这个项目是什么、定过什么」在项目 `.spec/`。
-新增通用硬规则直接在本文件加一节；另立规则文件放进 `rules/` 即自动随会话注入——注入脚本遍历目录，无需登记。
+每次会话强制在场的通用硬红线。「怎么做」在 [`dispatch.md`](dispatch.md) 与各技能；「这个项目是什么、定过什么」在项目 `.spec/`。维护本目录的方法见 [`README.md`](README.md)（不注入）。
 
 ## 协作 / 调度
 
 - **子 Agent 不得再派生别的子 Agent。** 调度权只在主 loop；被调用的子 Agent 只执行、不再派活（也符合宿主限制：subagent 不能再 spawn subagent）。
-- **子 Agent 的能力边界必须落到 frontmatter 的 `tools` 白名单，不能只写在正文里。** 只读角色就给只读工具集——没有 Bash 不等于没有 Write / Edit。frontmatter 只用 `name` + `description` + `tools` + `disallowedTools`；其余（追求什么、用哪些技能、不做什么）写进正文，`role` / `goal` 等不被宿主据以调度，写了不生效。
-- **改动若影响调度关系（增删子 Agent、改流程或技能分工），必须同步更新 [`dispatch.md`](dispatch.md)。** 漏更新 = 主 loop 调度依据失真。
+- **子 Agent 的能力边界必须落到 frontmatter 的 `tools` 白名单，不能只写在正文里。** 只读角色就给只读工具集——没有 Bash 不等于没有 Write / Edit。写法与维护义务见 [`README.md`](README.md)，由 `plugin-lint` / `spec-lint` 机器强制。
 
 ## 工程
 

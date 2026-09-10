@@ -11,8 +11,8 @@ import { join } from 'node:path'
 import {
   normalizeLine, hashLine, generateFingerprint, loadFingerprint, scanText, DEFAULT_RESERVED_HEADINGS, FINGERPRINT_API,
 } from '../plugin/tools/fingerprint.mjs'
-import { runSpecLint, formatReport } from '../plugin/tools/spec-lint/core.mjs'
-import { specFixture, writeFiles, makeTemp, cleanup, PLUGIN_ROOT } from './fixtures/w3/spec-fixture.mjs'
+import { runSpecLint, formatReport, PLUGIN_ROOT } from '../plugin/tools/spec-lint/core.mjs'
+import { specFixture, writeFiles, makeTemp, cleanup } from './fixtures/w3/spec-fixture.mjs'
 
 const GEN = join(PLUGIN_ROOT, 'tools', 'fingerprint.mjs')
 const RULE_LINES = [
@@ -97,6 +97,29 @@ describe('扫描判定', () => {
     writeFileSync(join(dir, 'bad.json'), JSON.stringify({ api: 99, lines: {} }))
     assert.throws(() => loadFingerprint(join(dir, 'bad.json')), /api=99/)
     cleanup(dir)
+  })
+})
+
+describe('过滤口径与注入一致', () => {
+  // rules/README.md 是维护指南，inject-rules 明确不注入它。指纹若把它算进来，
+  // 项目抄了里面的通用建议会被报成「抄了插件规则」，而指纹也不再等于「常驻规则」。
+  test('README.md 与点开头文件不进指纹', () => {
+    const dir = makeTemp('fp-filter-')
+    writeFiles(dir, {
+      'rules/system.md': '- 这一行是真规则,长度足够进指纹,应该被收进来。\n',
+      'rules/README.md': '- 这一行在维护指南里,长度也足够,但绝不该进指纹。\n',
+      'rules/.draft.md': '- 这一行在点开头的文件里,同样不该进指纹。\n',
+    })
+    const fp = generateFingerprint({ rulesDir: join(dir, 'rules') })
+    const files = [...new Set(Object.values(fp.lines).map((v) => v.split(':')[0]))]
+    cleanup(dir)
+    assert.deepEqual(files, ['rules/system.md'], `只应收 system.md,实得:${files.join(', ')}`)
+  })
+
+  test('本仓指纹只覆盖两份常驻规则', () => {
+    const fp = loadFingerprint(join(PLUGIN_ROOT, 'rules', '.fingerprint.json'))
+    const files = [...new Set(Object.values(fp.lines).map((v) => v.split(':')[0]))].sort()
+    assert.deepEqual(files, ['rules/dispatch.md', 'rules/system.md'])
   })
 })
 

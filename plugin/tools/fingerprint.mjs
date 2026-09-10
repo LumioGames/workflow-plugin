@@ -52,12 +52,17 @@ export const isFingerprintable = (normalized) => [...normalized].length >= MIN_L
 /** 标题比对口径:去空白、去尾部括号补充(「## 调度核心(名册)」仍算命中)。 */
 export const normalizeHeading = (h) => String(h).replace(/[（(].*$/, '').replace(/\s+/g, '')
 
+/**
+ * 收 rules/ 下会被注入的规则文件。**过滤口径必须与 tools/inject-rules.mjs 的 buildRulesContext 一致**:
+ * 排除 README.md 与点开头的文件。两边一旦不一致,指纹就会覆盖一个从不进会话的文件——
+ * 项目抄了维护指南里的通用建议会被报成「抄了插件规则」,而指纹也不再等于「常驻规则」。
+ */
 function walkMd(dir) {
   const out = []
   for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) out.push(...walkMd(p))
-    else if (name.endsWith('.md')) out.push(p)
+    else if (name.endsWith('.md') && name !== 'README.md' && !name.startsWith('.')) out.push(p)
   }
   return out
 }
