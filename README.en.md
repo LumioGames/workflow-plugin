@@ -177,7 +177,7 @@ npx plugins add LumioGames/workflow-plugin
 curl -fsSL https://workflow.games/plugin/install.sh | bash
 ```
 
-> Installs to `~/.codex/skills` by default; use `--target ~/.claude/skills` or `--target .agents/skills` for a project-level install.
+> Default `--mode full`: runtime lands in `$XDG_DATA_HOME/workflow/plugin` (or `~/.local/share/workflow/plugin`), and `~/.codex/skills/<skill>` is a symlink into that tree. `--mode skills` still installs only Markdown + VERSION and prints the capability boundary. You can also pass `--target ~/.claude/skills` or `--target .agents/skills` (project-level).
 
 No account yet? Just tell the agent **"connect me to Workflow"** — `workflow-setup` walks you through registration, token creation, config, and verification.
 
@@ -303,9 +303,9 @@ surfaces = ["web"]
 | :-- | :-- |
 | Claude Code (marketplace) | `claude plugin marketplace update workflow-plugin` + `claude plugin update workflow@workflow-plugin --scope user` (restart the session afterwards); autoUpdate and the `/plugin` UI also work |
 | Agent Plugins client | Re-run `npx plugins add LumioGames/workflow-plugin` |
-| Codex / manual | Tell the agent "update the workflow plugin" — checks the published version, verifies sha256 per file, backs up the old version, installs |
+| Codex / manual | Tell the agent "update the workflow plugin" — check the channel first, then run `workflow-install.mjs` (default full): sha256 plus allowlisted executables; backups go to `$XDG_DATA_HOME/workflow/backups/`, not the skills scan directory |
 
-Self-update downloads only from the `workflow.games` domain, and the skill package may contain only `.md` and `VERSION` plain-text files — **any executable in the manifest aborts the update with a warning.**
+Self-update downloads only from the `workflow.games` domain (or a local `--from-dir`). The **skills channel** may contain only `.md` and `VERSION`; **full runtime** allows `.mjs` listed in `runtime-manifest.json`. Any other executable aborts with no files written. The legacy website `files.json` is not a full runtime.
 
 ---
 
@@ -349,7 +349,7 @@ No. `workflow-feedback` uses a public anonymous endpoint: it **reads no Workflow
 
 ### Is the plugin open source, and under what license?
 
-Yes — MIT licensed, source at [github.com/LumioGames/workflow-plugin](https://github.com/LumioGames/workflow-plugin). The skill package is restricted to Markdown and `VERSION` plain-text files, and the self-updater aborts if any executable appears in the manifest.
+Yes — MIT licensed, source at [github.com/LumioGames/workflow-plugin](https://github.com/LumioGames/workflow-plugin). The skills channel is restricted to Markdown and `VERSION`; full runtime allows allowlisted `.mjs`. Anything else in the manifest aborts the update.
 
 ---
 
@@ -361,7 +361,7 @@ Send this to your AI agent verbatim — the effect is identical:
 Please install the Workflow (workflow.games) agent plugin for me:
 1. Fetch https://workflow.games/plugin/version.json?cb=<current timestamp> and read the version and files fields;
 2. Fetch the manifest that files points to (with the same cb parameter), download each file listed and verify its sha256; stop and tell me if any mismatch;
-3. Write the skill directories under skills/ into ~/.codex/skills/ (or ~/.claude/skills/ for a Claude Code manual install, or .agents/skills/ for a project-level install). The skill package should contain only Markdown and VERSION text files — stop immediately if you find an executable;
+3. Run the bundled installer (default --mode full): the full tree goes to $XDG_DATA_HOME/workflow/plugin, and ~/.codex/skills/<skill> points there. The skills channel allows only Markdown and VERSION; full allows allowlisted .mjs. Backups stay out of skills. The legacy files.json is not a full runtime;
 4. List the installed skills and versions;
 5. Then start the workflow-setup onboarding flow: first check whether ~/.config/workflow/config.toml already has a usable configuration.
 ```

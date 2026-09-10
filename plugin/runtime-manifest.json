@@ -1,0 +1,46 @@
+{
+  "api": 1,
+  "hostAdapterVersion": "1",
+  "modes": {
+    "skills": {
+      "summary": "只安装 skills/ 下的 Markdown 与 VERSION。技能可以发现，但规则、工具、模板、reviewer 都不会就位。",
+      "includes": ["skills/**"]
+    },
+    "full": {
+      "summary": "完整运行时：技能 + 规则 + 工具 + reviewer + 模板 + 命令 + 钩子。Codex 新用户应走这一档。",
+      "includes": [
+        "plugin.json",
+        "LICENSE",
+        ".claude-plugin/plugin.json",
+        "runtime-manifest.json",
+        "skills/**",
+        "rules/**",
+        "tools/**",
+        "agents/**",
+        "hosts/**",
+        "bin/**",
+        "templates/**",
+        "commands/**",
+        "hooks/**",
+        "references/**"
+      ]
+    }
+  },
+  "excludeDirNames": [
+    ".git",
+    "node_modules",
+    "tests",
+    ".github",
+    ".claude",
+    ".DS_Store"
+  ],
+  "excludeFiles": ["package.json", ".gitignore"],
+  "textExtensions": [".md", ".json", ".toml", ".txt"],
+  "textBasenames": ["LICENSE", "VERSION"],
+  "executableGlobs": [
+    "bin/*.mjs",
+    "bin/*.sh",
+    "tools/**/*.mjs",
+    "templates/**/*.mjs"
+  ]
+}
