@@ -13,11 +13,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { refreshIndex, TTL_MS, FULL_INTERVAL_MS } from "../tools/refresh-index.mjs";
-import { resolveCredentials, cacheIndexPath } from "../tools/lib/workflow-config.mjs";
+import { refreshIndex, TTL_MS, FULL_INTERVAL_MS } from "../plugin/tools/refresh-index.mjs";
+import { resolveCredentials, cacheIndexPath } from "../plugin/tools/lib/workflow-config.mjs";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const script = join(repoRoot, "tools/refresh-index.mjs");
+const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "plugin");
+const script = join(pluginRoot, "tools/refresh-index.mjs");
 
 const NOW = Date.parse("2026-09-10T12:00:00.000Z");
 const iso = (ms) => new Date(ms).toISOString();
@@ -562,7 +562,7 @@ describe("命令行入口", () => {
     assert.equal(r.stdout, "");
     assert.equal(r.stderr, "");
     assert.ok(existsSync(indexPath()));
-    assert.equal(existsSync(join(repoRoot, "workflow")), false);
+    assert.equal(existsSync(join(pluginRoot, "..", "workflow")), false);
     assert.deepEqual(Object.keys(readIndex().items).sort(), ["B-00001", "R-00001", "R-00002", "R-00003", "T-00001"]);
   });
 });

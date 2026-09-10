@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 export const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+/** 发布面根:插件资产(tools/ bin/ templates/ rules/ …)全部在 <仓库根>/plugin 下。 */
+export const PLUGIN_ROOT = join(REPO_ROOT, 'plugin')
 
 export const makeTemp = (prefix = 'w3-') => mkdtempSync(join(tmpdir(), prefix))
 

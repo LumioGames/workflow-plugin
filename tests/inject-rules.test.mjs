@@ -17,10 +17,9 @@ import {
   buildIndexLine,
   buildRulesContext,
   detectLegacyPlugin,
-} from "../tools/inject-rules.mjs";
+} from "../plugin/tools/inject-rules.mjs";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const script = join(repoRoot, "tools/inject-rules.mjs");
+const script = join(dirname(fileURLToPath(import.meta.url)), "..", "plugin", "tools/inject-rules.mjs");
 
 const HOST = "sandbox.example.test";
 let sandbox;

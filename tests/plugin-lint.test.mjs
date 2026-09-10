@@ -7,10 +7,10 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
-import { pluginLint, BANNED_RULE_WORDS } from '../tools/plugin-lint.mjs'
-import { makeTemp, writeFiles, cleanup, REPO_ROOT } from './fixtures/w3/spec-fixture.mjs'
+import { pluginLint, BANNED_RULE_WORDS } from '../plugin/tools/plugin-lint.mjs'
+import { makeTemp, writeFiles, cleanup, PLUGIN_ROOT } from './fixtures/w3/spec-fixture.mjs'
 
-const SCRIPT = join(REPO_ROOT, 'tools', 'plugin-lint.mjs')
+const SCRIPT = join(PLUGIN_ROOT, 'tools', 'plugin-lint.mjs')
 const BASE = { 'plugin.json': '{}\n', '.claude-plugin/plugin.json': '{}\n' }
 
 function lintFixture(files) {
@@ -21,12 +21,36 @@ function lintFixture(files) {
 
 describe('本仓', () => {
   test('对当前插件仓全绿(W1 / W2 的部件缺席时对应项跳过)', () => {
-    assert.deepEqual(pluginLint(REPO_ROOT), [])
+    assert.deepEqual(pluginLint(PLUGIN_ROOT), [])
     assert.match(execFileSync(process.execPath, [SCRIPT], { encoding: 'utf8' }), /plugin-lint: OK/)
   })
 
   test('只有清单、没有任何部件 → 零错误', () => {
     assert.deepEqual(lintFixture({}), [])
+  })
+})
+
+describe('发布面隔离', () => {
+  // 发布面 = 装进用户机器的全部内容。这几样混进来会被原样下发:
+  // tests/ 与 package.json 对用户没意义,.claude/ 会把本仓自己的项目配置带进别人的项目。
+  const LEAKED = {
+    tests: { 'tests/x.test.mjs': 'export {}\n' },
+    '.github': { '.github/workflows/ci.yml': 'name: CI\n' },
+    'package.json': { 'package.json': '{}\n' },
+    '.gitignore': { '.gitignore': 'node_modules\n' },
+    '.claude': { '.claude/settings.json': '{}\n' },
+  }
+  for (const [leaked, files] of Object.entries(LEAKED)) {
+    test(`插件根出现 ${leaked} → 报错`, () => {
+      const errors = lintFixture(files)
+      assert.equal(errors.length, 1, `期望只报 ${leaked} 一条,实得:${errors.join(' | ')}`)
+      assert.match(errors[0], /发布面混入开发过程文件/)
+      assert.ok(errors[0].includes(leaked), `报错里应点名 ${leaked}:${errors[0]}`)
+    })
+  }
+
+  test('本仓 plugin/ 下没有任何开发过程文件', () => {
+    assert.deepEqual(pluginLint(PLUGIN_ROOT), [])
   })
 })
 

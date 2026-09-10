@@ -11,10 +11,10 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "plugin");
 
 function read(relativePath) {
-  const absolute = join(repoRoot, relativePath);
+  const absolute = join(pluginRoot, relativePath);
   assert.ok(existsSync(absolute), `缺少 ${relativePath}`);
   return readFileSync(absolute, "utf8");
 }
@@ -53,19 +53,19 @@ describe("方法技能结构", () => {
     test(`${name}：附件齐全且被 SKILL.md 引用；目录里只有 Markdown`, () => {
       const skill = read(`skills/${name}/SKILL.md`);
       for (const attachment of attachments) {
-        assert.ok(existsSync(join(repoRoot, "skills", name, attachment)), `缺少附件 ${attachment}`);
+        assert.ok(existsSync(join(pluginRoot, "skills", name, attachment)), `缺少附件 ${attachment}`);
         assert.ok(skill.includes(`](${attachment})`), `SKILL.md 未链接附件 ${attachment}`);
       }
-      for (const absolutePath of listFiles(join(repoRoot, "skills", name))) {
-        assert.equal(extname(absolutePath), ".md", `${relative(repoRoot, absolutePath)} 不是 Markdown——技能包只允许 .md`);
+      for (const absolutePath of listFiles(join(pluginRoot, "skills", name))) {
+        assert.equal(extname(absolutePath), ".md", `${relative(pluginRoot, absolutePath)} 不是 Markdown——技能包只允许 .md`);
       }
     });
 
     test(`${name}：不含旧口径禁用词`, () => {
-      for (const absolutePath of listFiles(join(repoRoot, "skills", name))) {
+      for (const absolutePath of listFiles(join(pluginRoot, "skills", name))) {
         const content = readFileSync(absolutePath, "utf8");
         for (const term of FORBIDDEN) {
-          assert.ok(!content.includes(term), `${relative(repoRoot, absolutePath)} 出现禁用词「${term}」`);
+          assert.ok(!content.includes(term), `${relative(pluginRoot, absolutePath)} 出现禁用词「${term}」`);
         }
       }
     });
@@ -145,8 +145,8 @@ describe("旧口径词棘轮（整个 skills/ 树）", () => {
 
   test("禁用词命中只能是登记在案的那些文件与词，不得新增", () => {
     const unexpected = [];
-    for (const absolutePath of listFiles(join(repoRoot, "skills"))) {
-      const rel = relative(repoRoot, absolutePath);
+    for (const absolutePath of listFiles(join(pluginRoot, "skills"))) {
+      const rel = relative(pluginRoot, absolutePath);
       const content = readFileSync(absolutePath, "utf8");
       const allowed = new Set(baseline[rel] ?? []);
       for (const term of FORBIDDEN) {
@@ -159,7 +159,7 @@ describe("旧口径词棘轮（整个 skills/ 树）", () => {
   test("登记在案的命中若已被清掉，就从 baseline 里删掉（棘轮只能收紧）", () => {
     const stale = [];
     for (const [rel, terms] of Object.entries(baseline)) {
-      const content = existsSync(join(repoRoot, rel)) ? readFileSync(join(repoRoot, rel), "utf8") : "";
+      const content = existsSync(join(pluginRoot, rel)) ? readFileSync(join(pluginRoot, rel), "utf8") : "";
       for (const term of terms) {
         if (!content.includes(term)) stale.push(`${rel}：「${term}」`);
       }

@@ -7,9 +7,9 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { runSpecLint, formatReport } from '../tools/spec-lint/core.mjs'
-import { generateFingerprint } from '../tools/fingerprint.mjs'
-import { specFixture, withDecisions, writeFiles, cleanup, REPO_ROOT } from './fixtures/w3/spec-fixture.mjs'
+import { runSpecLint, formatReport } from '../plugin/tools/spec-lint/core.mjs'
+import { generateFingerprint } from '../plugin/tools/fingerprint.mjs'
+import { specFixture, withDecisions, writeFiles, cleanup, PLUGIN_ROOT } from './fixtures/w3/spec-fixture.mjs'
 
 const EXT = '.spec/tools/lint-extensions.mjs'
 async function lint(root, options = {}) {
@@ -165,7 +165,7 @@ describe('config', () => {
 })
 
 describe('templates 里的样例扩展', () => {
-  const SAMPLE = readFileSync(join(REPO_ROOT, 'templates/.spec/tools/lint-extensions.mjs'), 'utf8')
+  const SAMPLE = readFileSync(join(PLUGIN_ROOT, 'templates/.spec/tools/lint-extensions.mjs'), 'utf8')
 
   test('样例按 api=1 加载出两项,在没有校验面的项目上一项跳过一项通过', async () => {
     const result = await lint(specFixture({ [EXT]: SAMPLE }))

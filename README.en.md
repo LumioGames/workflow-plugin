@@ -133,9 +133,30 @@ Why a separate context at all: **the author and the reviewer must be two context
 
 ---
 
+## Repository layout
+
+This repo is both the plugin and a project that uses it. **Users install `plugin/` only.**
+
+```
+workflow-plugin/
+├── plugin/            # ★ Publish surface: skills/ agents/ commands/ hooks/ rules/ templates/ tools/ bin/
+├── .claude-plugin/    # marketplace.json (stays at the repo root, points at plugin/ via git-subdir)
+└── tests/             # Development surface, never shipped; same for package.json and .github/
+```
+
+Putting development files (`tests/`, `package.json`, `.github/`, `.gitignore`, `.claude/`) inside
+`plugin/` is rejected by `plugin-lint`'s publish-surface isolation check — otherwise they would be
+installed verbatim onto users' machines.
+
+**Local development**: `git-subdir` clones from the remote URL, so a local-path marketplace cannot
+install a subdirectory plugin. To see your edits live, symlink the matching directory under
+`~/.claude/plugins/` to this repo's `plugin/` (do not commit that symlink).
+
+---
+
 ## How do I install it?
 
-This repository is simultaneously an **[Agent Plugins 1.0.0](https://agent-plugins.org/)** package and a Claude Code marketplace — the repository root is the plugin root, so both ecosystems install it directly.
+This repository is simultaneously an **[Agent Plugins 1.0.0](https://agent-plugins.org/)** package and a Claude Code marketplace — the plugin itself lives in [`plugin/`](plugin/) and the repository root holds only the development surface (see [Repository layout](#repository-layout)), so both ecosystems install it directly.
 
 **Agent Plugins clients** (Cursor, Codex, Copilot, VS Code, Kiro, …)
 

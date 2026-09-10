@@ -10,8 +10,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const feedbackRoot = join(repoRoot, "skills/workflow-feedback");
+const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "plugin");
+const feedbackRoot = join(pluginRoot, "skills/workflow-feedback");
 
 function listFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -21,7 +21,7 @@ function listFiles(directory) {
 }
 
 function read(relativePath) {
-  const absolute = join(repoRoot, relativePath);
+  const absolute = join(pluginRoot, relativePath);
   assert.ok(existsSync(absolute), `缺少 ${relativePath}`);
   return readFileSync(absolute, "utf8");
 }
@@ -261,7 +261,7 @@ describe("入口、卫生与预算", () => {
 
   test("技能只含 Markdown，相对链接全部有效", () => {
     for (const absolute of listFiles(feedbackRoot)) {
-      const display = relative(repoRoot, absolute);
+      const display = relative(pluginRoot, absolute);
       assert.equal(extname(absolute), ".md", `${display} 不是 Markdown`);
       const content = readFileSync(absolute, "utf8");
       for (const match of content.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {

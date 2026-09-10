@@ -9,11 +9,11 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { runSpecLint, formatReport, DEFAULT_CONFIG } from '../tools/spec-lint/core.mjs'
-import { CORE_CHECKS } from '../tools/spec-lint/checks/index.mjs'
-import { specFixture, withDecisions, writeFiles, gitInit, cleanup, makeTemp, REPO_ROOT } from './fixtures/w3/spec-fixture.mjs'
+import { runSpecLint, formatReport, DEFAULT_CONFIG } from '../plugin/tools/spec-lint/core.mjs'
+import { CORE_CHECKS } from '../plugin/tools/spec-lint/checks/index.mjs'
+import { specFixture, withDecisions, writeFiles, gitInit, cleanup, makeTemp, PLUGIN_ROOT } from './fixtures/w3/spec-fixture.mjs'
 
-const BIN = join(REPO_ROOT, 'bin', 'spec-lint.mjs')
+const BIN = join(PLUGIN_ROOT, 'bin', 'spec-lint.mjs')
 
 async function lint(root, options = {}) {
   try {

@@ -10,8 +10,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const qaRoot = join(repoRoot, "skills/workflow-qa");
+const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "plugin");
+const qaRoot = join(pluginRoot, "skills/workflow-qa");
 
 function listFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -21,7 +21,7 @@ function listFiles(directory) {
 }
 
 function read(relativePath) {
-  const absolute = join(repoRoot, relativePath);
+  const absolute = join(pluginRoot, relativePath);
   assert.ok(existsSync(absolute), `缺少 ${relativePath}`);
   return readFileSync(absolute, "utf8");
 }
@@ -143,9 +143,9 @@ describe("线上实测的底线", () => {
 });
 
 describe("公开插件的脱敏与体量", () => {
-  const publicFiles = [...listFiles(join(repoRoot, "skills")), ...listFiles(join(repoRoot, "commands"))]
+  const publicFiles = [...listFiles(join(pluginRoot, "skills")), ...listFiles(join(pluginRoot, "commands"))]
     .filter((file) => extname(file) === ".md")
-    .map((file) => ({ path: relative(repoRoot, file), text: readFileSync(file, "utf8") }));
+    .map((file) => ({ path: relative(pluginRoot, file), text: readFileSync(file, "utf8") }));
 
   test("技能与命令里不得出现内部项目名、内部路径或疑似凭据", () => {
     // 两个原型技能来自内部仓库，直接抄会把内部线上地址带进公开插件。
@@ -186,7 +186,7 @@ describe("公开插件的脱敏与体量", () => {
 
   test("QA 技能只含 Markdown，相对链接全部有效", () => {
     for (const absolute of listFiles(qaRoot)) {
-      const display = relative(repoRoot, absolute);
+      const display = relative(pluginRoot, absolute);
       assert.equal(extname(absolute), ".md", `${display} 不是 Markdown`);
       const content = readFileSync(absolute, "utf8");
       for (const match of content.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {

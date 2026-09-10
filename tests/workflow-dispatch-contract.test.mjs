@@ -9,10 +9,10 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "plugin");
 
 function read(relativePath) {
-  const absolute = join(repoRoot, relativePath);
+  const absolute = join(pluginRoot, relativePath);
   assert.ok(existsSync(absolute), `缺少 ${relativePath}`);
   return readFileSync(absolute, "utf8");
 }
@@ -131,12 +131,12 @@ describe("workflow-dispatch 边界", () => {
   });
 
   test("相对链接全部可达", () => {
-    for (const absolutePath of listFiles(join(repoRoot, "skills/workflow-dispatch"))) {
+    for (const absolutePath of listFiles(join(pluginRoot, "skills/workflow-dispatch"))) {
       const content = readFileSync(absolutePath, "utf8");
       for (const match of content.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
         const target = match[1].split("#", 1)[0];
         if (!target || /^[a-z]+:/i.test(target)) continue;
-        assert.ok(existsSync(join(dirname(absolutePath), target)), `${relative(repoRoot, absolutePath)} 的相对链接不存在：${target}`);
+        assert.ok(existsSync(join(dirname(absolutePath), target)), `${relative(pluginRoot, absolutePath)} 的相对链接不存在：${target}`);
       }
     }
   });
@@ -193,20 +193,20 @@ describe("agents/reviewer.md", () => {
 
 describe("语汇替换：调度面不出现旧口径", () => {
   const forbidden = ["契约卡", "wave", ".spec/tasks", "收口门槛", "铁律", "in_progress", "pending"];
-  const files = [...listFiles(join(repoRoot, "skills/workflow-dispatch")), ...listFiles(join(repoRoot, "agents"))];
+  const files = [...listFiles(join(pluginRoot, "skills/workflow-dispatch")), ...listFiles(join(pluginRoot, "agents"))];
 
   test("workflow-dispatch/** 与 agents/** 不含禁用词", () => {
     for (const absolutePath of files) {
       const content = readFileSync(absolutePath, "utf8");
       for (const term of forbidden) {
-        assert.ok(!content.includes(term), `${relative(repoRoot, absolutePath)} 出现禁用词「${term}」`);
+        assert.ok(!content.includes(term), `${relative(pluginRoot, absolutePath)} 出现禁用词「${term}」`);
       }
     }
   });
 
   test("只含 Markdown 文件", () => {
     for (const absolutePath of files) {
-      assert.equal(extname(absolutePath), ".md", `${relative(repoRoot, absolutePath)} 不是 Markdown`);
+      assert.equal(extname(absolutePath), ".md", `${relative(pluginRoot, absolutePath)} 不是 Markdown`);
     }
   });
 });
