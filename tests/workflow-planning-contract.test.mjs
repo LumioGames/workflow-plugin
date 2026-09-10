@@ -235,12 +235,15 @@ test("规划技能保持上下文预算：强制读取的文件不得无限膨�
     ...listFiles(overlayDir).map((file) => Buffer.byteLength(readFileSync(file, "utf8"), "utf8")),
   );
 
-  // 1.2.0 上调到 30_500：planning-process.md 是本技能**强制读取**的文件，而它原先写着
+  // 1.2.0 上调到 32_000：planning-process.md 是本技能**强制读取**的文件，而它原先写着
   // 「最终合入受保护分支前做整体 Review」与「对可自动化代码行为一律 Red-Green-Refactor」——
   // 两道比冻结口径更严的门。改成合入后审 + TDD 按需用，措辞要同时讲清「做什么」与「不再是门」，
   // 比原文长。加之前已按「先删冗余」压过两轮。
+  //
+  // **余量政策**：上调时留 5–10% 余量，不要卡着当前值 +ε。余量只剩一两百字节的预算不是
+  // 早期预警，是每次改动都要跨的仪式——那会把人训练成顺手上调，而不是想一想该不该加。
   // 预算保留：它防的是无意识膨胀，不是禁止修正错误口径。
-  const budget = 30_500;
+  const budget = 32_000;
   assert.ok(
     mandatory + largestOverlay < budget,
     `单次规划需加载 ${mandatory + largestOverlay} 字节，超出预算 ${budget}——新增内容应放进按需读取的 references`,
