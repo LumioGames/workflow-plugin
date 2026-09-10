@@ -6,7 +6,7 @@
 
 **把 Claude Code / Cursor / Codex 直接接进 [Workflow](https://workflow.games) —— 需求、缺陷、任务、状态流转、线上验收，全部由 Agent 自己跑完。**
 
-![version](https://img.shields.io/badge/version-0.9.1-2ea44f) ![skills](https://img.shields.io/badge/skills-10-blue) ![spec](https://img.shields.io/badge/Agent%20Plugins-1.0.0-8b5cf6) ![API](https://img.shields.io/badge/API-OpenAPI%20%E5%90%88%E5%90%8C%E7%9C%9F%E5%80%BC-orange) ![write](https://img.shields.io/badge/%E5%86%99%E6%93%8D%E4%BD%9C-%E5%85%A8%E9%87%8F%E8%AF%BB%E5%9B%9E%E9%AA%8C%E8%AF%81-red)
+![version](https://img.shields.io/badge/version-1.0.0-2ea44f) ![skills](https://img.shields.io/badge/skills-16-blue) ![spec](https://img.shields.io/badge/Agent%20Plugins-1.0.0-8b5cf6) ![API](https://img.shields.io/badge/API-OpenAPI%20%E5%90%88%E5%90%8C%E7%9C%9F%E5%80%BC-orange) ![write](https://img.shields.io/badge/%E5%86%99%E6%93%8D%E4%BD%9C-%E5%85%A8%E9%87%8F%E8%AF%BB%E5%9B%9E%E9%AA%8C%E8%AF%81-red)
 
 **简体中文** · [English](./README.en.md)
 
@@ -38,7 +38,9 @@
 
 **Workflow Agent 插件把 Claude Code、Cursor、Codex 等 AI 编码 Agent 直接接入 [Workflow](https://workflow.games)（workflow.games）项目管理平台。** 装好之后，AI Agent 能把一句话需求拆成可执行的开发蓝图并落单、带查重地记录缺陷、在真实线上环境跑测验收，并按判定流转工单状态 —— 且**每一次写入都必须读回验证**才允许声称成功。
 
-插件包含 10 个技能、10 个斜杠命令、21 条硬闸门（G1–G7 落单闸门、Q1–Q7 QA 闸门与 F1–F7 反馈闸门），以线上 OpenAPI 合同为真值的自动化测试并每周校验合同漂移。规划和所有写回默认先落 `.workflow-drafts/<bundleId>/`，依赖分析与受控并发上传由专用 skill 处理。遵循 [Agent Plugins 1.0.0](https://agent-plugins.org/) 规范，同时兼容 Claude Code marketplace，MIT 许可。
+插件包含 16 个技能、13 个斜杠命令、21 条硬闸门（G1–G7 落单闸门、Q1–Q7 QA 闸门与 F1–F7 反馈闸门），以线上 OpenAPI 合同为真值的自动化测试并每周校验合同漂移。规划和所有写回默认先落 `.workflow-drafts/<bundleId>/`，依赖分析与受控并发上传由专用 skill 处理。遵循 [Agent Plugins 1.0.0](https://agent-plugins.org/) 规范，同时兼容 Claude Code marketplace，MIT 许可。
+
+**1.0.0 起它还管开发本身怎么做**：会话开始自动注入通用规则并把线上单据拉成本地索引，随包附带 brainstorming / TDD / 排障 / 沉淀 / 收审五个方法技能与一个只读 reviewer 子 Agent，外加项目文档结构体检（`/workflow:lint`）与脚手架（`/workflow:init`）。
 
 ---
 
@@ -84,6 +86,12 @@ Agent 十分钟改完三个模块，然后你打开 PM 系统，一条记录都�
 | 🔄 `workflow-update` | 自检版本、校验 sha256、安全自更新 |
 | 🧩 `workflow-dependencies` | 自动分析上下游依赖，补全 direct edge、传递链和阻塞链，保留证据与置信度 |
 | ⬆️ `workflow-upload` | 从本地 bundle 按权限模式受控并发上传、幂等恢复并逐项读回 |
+| 🚦 `workflow-dispatch` | **主 loop 一次扇出多张单再合入** —— 从 Room 取 ready 且文件集互斥的单、各开独立 git worktree 并行派遣、以 diff 为准收交回物、合入后统一触发一次 reviewer，结论写成 bug 单与评论 |
+| 💡 `brainstorming` | 动手之前先把想法问成有共识的设计：澄清意图、比较方案、写成项目活文档并记决策，再交给 `workflow-planning` 拆单 |
+| 🧫 `test-driven-development` | 写生产代码之前先写一个会失败的测试：红 → 最小实现 → 重构；附反模式清单 |
+| 🔍 `systematic-debugging` | 遇 bug 先走「根因调查 → 模式分析 → 假设验证 → 实施」四阶段，**没定位根因不许动手改**；修 3 次不成就质疑架构 |
+| 📚 `spec-steward` | 改完把「改了什么、为什么」沉淀回项目 `.spec/`：放对位置、frontmatter 合规、导航与 ADR 索引同步、在途工作写单号 |
+| 📝 `receiving-code-review` | 收到审查意见后先核实再改，一次一项各自验证，不表演性认同，也允许有理有据地反驳 |
 
 ---
 
@@ -94,6 +102,50 @@ Requirement 之间的关联通过原生 `references` API 建立：`PUT /api/v1/r
 `source` / `target` 只是稳定展示顺序，不代表谁依赖谁。`workflow-dependencies` 仍维护
 `upstream → downstream` 的 direct edge、传递链、阻塞链和证据，上传器只绑定 direct edge，并按无序
 UUID 对验证图谱结果。
+
+---
+
+### 钩子与本地索引
+
+装上插件后，**每次会话开始**（启动 / 恢复 / `/clear` / 压缩后）自动跑两件事，不用你敲任何命令：
+
+**① 注入通用规则。** `rules/` 下的规则全量进上下文——怎么派活、怎么收口、什么绝对不许做。规则是插件资产、跟着插件版本升级，**项目自己不要抄一份**（抄了 `/workflow:lint` 会报「项目抄插件」）。
+
+**② 把线上单据拉成本地索引。** 落在 `$XDG_CACHE_HOME/workflow/index/<host>.json`（没设 XDG 时 `~/.cache`），不进仓库、不进插件根。规则是这样定的：
+
+- **15 分钟内不重拉**，失败也占这 15 分钟——否则离线时每次开会话都要空等一轮超时；
+- **每天一次全量对齐**（按 Room 枚举需求），其余走增量；
+- **联不上就沿用旧快照**并在文件里标「离线沿用」和时间，退出码恒 0——索引是便利，不是门；
+- 注入上下文的**只有一行计数**（路径 / 条数 / 各 Room 计数 / 多久前刷新），正文一个字不进——要找单号时 Agent 自己 grep 那个文件，几万字的看板不占你的上下文预算；
+- **索引只用来找单号和 Room，状态以线上为准**——流转前一律现查 transitions，不许照索引里的 `status` 办事。
+
+想立刻刷新（比如刚建完一批单）就跑 `/workflow:index`，它忽略 15 分钟有效期。当前目录没有 `.workflow` 标记时，它什么都不拉、也不警告——先 `/workflow:setup` 绑定项目。
+
+### 结构体检与脚手架
+
+**`/workflow:lint` —— 项目 `.spec/` 的结构体检，只报告不阻断。** 默认退出码恒 0：红是待办，不是门，允许带红提交；只有传 `--strict` 才在有错误时退出 1（给 CI 用），`--json` 输出机器可读结果。检查顺序固定、一份报告：
+
+1. **通用项** —— 核心文件、frontmatter、导航与 ADR 索引覆盖、链接可达、`@import` 完整、软链存活、ADR 撞号与状态行、禁并行文档根；
+2. **项目扩展** —— 可选的 `.spec/tools/lint-extensions.mjs`，导出 `api = 1` 即被加载（版本对不上会**报错**，不会静默跳过），项目在这里加自己的检查项；
+3. **指纹** —— 项目的 `AGENTS.md` / `rules/` 里出现插件的保留标题、或连续 3 行与插件规则逐字相同，就报「项目抄了插件」。通用规则每次会话注入，抄一份只会让两边慢慢长歪。
+
+**`/workflow:init` —— 生成项目专属的那一半。** 只写「这个项目是什么、定过什么」：`.spec/AGENTS.md`、`.spec/rules/system.md`（项目专属红线的空模板）、`.spec/knowledge/README.md` 与功能文档模板、`.spec/decisions/README.md`、`.spec/tools/lint-extensions.mjs` 样例，以及根 `CLAUDE.md`。默认不覆盖已有文件，可以升级插件后再跑一次补齐新模板。**不写 `.workflow`、不生成 token**——项目绑定走 `/workflow:setup`；也不生成本地任务目录，任务真值只有 Workflow。
+
+CI 里不装插件也能跑同一套体检：
+
+```bash
+npx github:LumioGames/workflow-plugin spec-lint . --strict
+```
+
+### reviewer 子 Agent
+
+`agents/reviewer.md` 是一个**只读的对抗审查者**：假设交付有问题，然后去证伪。它的定位被写死成三条——
+
+- **合入后审一次，不挡合入。** 合入只守「能编过」；报告里的 findings 是待办，由主 loop 决定补单、派修、再审，不是回滚门。
+- **没有 Bash。** 不跑测试、不跑 lint、不跑构建、不碰 git。diff 由主 loop 生成成文件交给它，被改文件按需读。
+- **只出报告。** 不流转单、不建单、不评论、不改代码——结论由主 loop 统一写成 bug 单与评论，保持单一写入方。
+
+为什么要单开一个上下文：**写的人和审的人必须是两个上下文**，自己审自己的产出，审查必然失效。
 
 ---
 
@@ -124,7 +176,9 @@ curl -fsSL https://workflow.games/plugin/install.sh | bash
 
 没有账号也不要紧 —— 装完直接对 Agent 说 **「接入 Workflow」**，`workflow-setup` 一步步带你走完注册、建 token、写配置、验证连接。
 
-装好即得十个命令：`/workflow:setup`、`/workflow:plan <描述>`、`/workflow:bug <描述>`、`/workflow:take <单号>`、`/workflow:qa <单号>`、`/workflow:deps <单号或草稿>`、`/workflow:upload <bundle>`、`/workflow:policy <show|set>`、`/workflow:feedback <描述>`、`/workflow:update`。
+装好即得十三个命令：`/workflow:setup`、`/workflow:plan <描述>`、`/workflow:bug <描述>`、`/workflow:take <单号>`、`/workflow:qa <单号>`、`/workflow:deps <单号或草稿>`、`/workflow:upload <bundle>`、`/workflow:policy <show|set>`、`/workflow:feedback <描述>`、`/workflow:update`，以及 1.0.0 新增的 `/workflow:init`、`/workflow:lint`、`/workflow:index`。
+
+> **装过 `lumioagentspec` 插件的注意**：它的全部功能已并入本插件 1.0.0，两边同时启用会重复注入规则——所以检测到它还开着时，每次会话开始都会提示你卸载。
 
 ---
 

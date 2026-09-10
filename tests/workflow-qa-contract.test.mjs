@@ -149,13 +149,17 @@ describe("公开插件的脱敏与体量", () => {
 
   test("技能与命令里不得出现内部项目名、内部路径或疑似凭据", () => {
     // 两个原型技能来自内部仓库，直接抄会把内部线上地址带进公开插件。
+    //
+    // `.spec/` 曾经也在这张表里，现已移出：它是本插件公开发布的项目脚手架约定
+    // （/workflow:init 生成、/workflow:lint 校验、技能要指向项目 .spec/knowledge 与
+    // .spec/decisions），不再是某个内部仓的私有路径。内部仓名与凭据的禁令一条不减——
+    // 带仓名的安装命令只写在 README（不在本扫描范围），技能与命令里一律用 /workflow:lint。
     const forbidden = [
       /LumioGameWorkFlow/i,
       /lumio/i,
       /danaoshao/i,
       /bestcodex/i,
       /cchaven/i,
-      /(^|[^\w.])\.spec\//,
       /localhost/i,
       /wfp_[0-9a-zA-Z]{12,}/,
     ];
