@@ -2,6 +2,14 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.4]
+
+完整安装把插件规则以受管 symlink 挂到宿主会扫描的 `.agents/rules/`，不把正文抄进项目。
+
+- full 模式在 `~/.agents/rules/<file>.md` 指向运行时 `rules/*.md`（排除 README 与点文件）；用户自有文件不覆盖。适配项目时同样可写 `<repo>/.agents/rules/`。
+- 不写 `.spec/rules/`，不把规则字节写入 AGENTS.md；备份仍只落在 `$XDG_DATA_HOME/workflow/backups/`。
+- `AGENTS.md` 哨兵块仍作不扫描 `.agents/rules/` 的宿主回退——仅有指针不会注入规则。
+
 ## [1.3.3]
 
 `rules/system.md` 工程节拆成「第一性原理」与「工程红线」两小节，只改排版、语义不变。

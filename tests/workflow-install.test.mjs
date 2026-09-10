@@ -1,8 +1,8 @@
 // workflow-install：官网装完不能用的缺口。隔离 HOME / XDG / CODEX_HOME，不碰本机 Codex。
 //
 // 锁死：--from-dir 首装与重装幂等、.bak-* 迁出扫描目录、哈希失败不落盘、
-// 换根失败回滚、用户 AGENTS.md / 外来 agent 保留、--doctor 能报 skills-only、
-// 官网 1.2.0 files.json 不能当 full。
+// 换根失败回滚、用户 AGENTS.md / 外来 agent / .agents/rules 自有文件保留、
+// --doctor 能报 skills-only、官网 1.2.0 files.json 不能当 full。
 
 import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
@@ -20,7 +20,7 @@ import {
 } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
@@ -90,6 +90,58 @@ describe('--from-dir 首装 / 重装', () => {
     assert.match(readFileSync(layout.agentsMd, 'utf8'), new RegExp(MANAGED_BEGIN))
     assert.match(readFileSync(layout.reviewerToml, 'utf8'), /managed-by: workflow-plugin/)
     assert.equal(existsSync(join(layout.agentsDir, 'reviewer.md')), false, '不做 reviewer.md 伴生 symlink')
+    const ruleLink = join(layout.home, '.agents', 'rules', 'system.md')
+    assert.ok(lstatSync(ruleLink).isSymbolicLink(), '规则应是指向运行时的 symlink')
+    assert.equal(
+      resolve(dirname(ruleLink), readlinkSync(ruleLink)),
+      join(layout.pluginDir, 'rules', 'system.md'),
+    )
+    assert.ok(lstatSync(join(layout.home, '.agents', 'rules', 'dispatch.md')).isSymbolicLink())
+    assert.equal(existsSync(join(layout.home, '.agents', 'rules', 'README.md')), false, '不链 README.md')
+    assert.ok(result.installedRules.some((r) => r.name === 'system.md'))
+    assert.ok(result.installedRules.every((r) => !String(r.dir).includes(`${sep}.spec${sep}`)))
+  })
+
+  test('full 不覆盖 .agents/rules 里用户自有文件', () => {
+    const destDir = join(layout.home, '.agents', 'rules')
+    mkdirSync(destDir, { recursive: true })
+    const userFile = join(destDir, 'system.md')
+    writeFileSync(userFile, '# 我的规则\n')
+    applyFromSource({ source: pluginRoot, layout, mode: 'full' })
+    assert.equal(readFileSync(userFile, 'utf8'), '# 我的规则\n')
+    assert.equal(lstatSync(userFile).isSymbolicLink(), false)
+    const dispatch = join(destDir, 'dispatch.md')
+    assert.ok(lstatSync(dispatch).isSymbolicLink())
+    assert.equal(
+      resolve(dirname(dispatch), readlinkSync(dispatch)),
+      join(layout.pluginDir, 'rules', 'dispatch.md'),
+    )
+    assert.equal(existsSync(join(destDir, 'README.md')), false)
+    assert.equal(readdirSync(destDir).some((n) => n.includes('.bak-')), false, '备份不得进 .agents/rules')
+  })
+
+  test('适配项目时写入 <repo>/.agents/rules，不写 .spec/rules，不覆盖用户文件', () => {
+    const project = join(sandbox, 'repo')
+    mkdirSync(join(project, '.spec', 'rules'), { recursive: true })
+    mkdirSync(join(project, '.agents', 'rules'), { recursive: true })
+    writeFileSync(join(project, '.spec', 'rules', 'system.md'), '# 项目专属红线\n')
+    writeFileSync(join(project, '.agents', 'rules', 'custom.md'), '# 用户的\n')
+    const projectLayout = resolveLayout({
+      env: isolatedEnv(layout.home),
+      home: layout.home,
+      skillsTarget: join(project, '.agents', 'skills'),
+    })
+    applyFromSource({ source: pluginRoot, layout: projectLayout, mode: 'full' })
+    const linked = join(project, '.agents', 'rules', 'system.md')
+    assert.ok(lstatSync(linked).isSymbolicLink())
+    assert.equal(
+      resolve(dirname(linked), readlinkSync(linked)),
+      join(projectLayout.pluginDir, 'rules', 'system.md'),
+    )
+    assert.equal(readFileSync(join(project, '.spec', 'rules', 'system.md'), 'utf8'), '# 项目专属红线\n')
+    assert.equal(lstatSync(join(project, '.spec', 'rules', 'system.md')).isSymbolicLink(), false)
+    assert.equal(readFileSync(join(project, '.agents', 'rules', 'custom.md'), 'utf8'), '# 用户的\n')
+    assert.ok(lstatSync(join(layout.home, '.agents', 'rules', 'system.md')).isSymbolicLink())
   })
 
   test('重装幂等：用户 AGENTS.md 正文保留，不重复哨兵块', () => {
@@ -218,6 +270,7 @@ describe('用户资产与 doctor', () => {
     assert.equal(report.mode, 'skills')
     assert.ok(report.findings.some((f) => f.id === 'skills-only'))
     assert.equal(existsSync(join(layout.pluginDir, 'rules/system.md')), false)
+    assert.equal(existsSync(join(layout.home, '.agents', 'rules', 'system.md')), false)
   })
 
   test('install.sh 转调 --doctor，隔离环境不碰本机', () => {
