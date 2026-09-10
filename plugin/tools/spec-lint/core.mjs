@@ -50,7 +50,11 @@ export const DEFAULT_CONFIG = Object.freeze({
 const LEVELS = new Set(['error', 'warn', 'info'])
 const CONFIG_KEYS = new Set(Object.keys(DEFAULT_CONFIG))
 
-/** 指纹检查:项目 .spec/AGENTS.md、.spec/rules/*.md 与仓根 AGENTS.md。 */
+/**
+ * 指纹检查:项目 .spec/AGENTS.md、.spec/rules/*.md 与仓根 CLAUDE.md / AGENTS.md。
+ * **CLAUDE.md 必须扫**:它才是 Claude Code 的实际生效入口(见 checks/imports.mjs)。
+ * 只扫 AGENTS.md 时,把整段插件规则原样抄进 CLAUDE.md 是零命中的——检查面漏了真正的入口。
+ */
 const fingerprintCheck = {
   id: 'fingerprint',
   title: '项目抄插件(保留标题 / 连续命中)',
@@ -66,6 +70,7 @@ const fingerprintCheck = {
       join(spec, 'AGENTS.md'),
       ...walkFn(join(spec, 'rules'), (p) => p.endsWith('.md')),
       join(root, 'AGENTS.md'),
+      join(root, 'CLAUDE.md'),
     ].filter(existsSync)
     for (const file of files) {
       const { headings, runs } = scanText(readFileSync(file, 'utf8'), fp)

@@ -43,6 +43,12 @@ before(async () => {
     calls.push({ path: url.pathname, query: Object.fromEntries(url.searchParams), auth: req.headers.authorization });
     const result = handler(url, req);
     if (result === "hang") return; // 故意不回
+    if (result === "headers-then-hang") {
+      // headers 先到、body 永不结束：这是 clearTimeout 放在 finally 里时会漏掉的那段。
+      res.writeHead(200, { "content-type": "application/json" });
+      res.write('{"items":[');
+      return;
+    }
     respond(res, result);
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -74,7 +80,8 @@ beforeEach(() => {
 });
 
 const env = () => ({ PATH: process.env.PATH, HOME: home, XDG_CACHE_HOME: cacheHome });
-const indexPath = () => cacheIndexPath({ env: env(), home, host: "127.0.0.1" });
+// 不硬编码缓存文件名：身份键含端口与凭据指纹，让被测实现自己算路径。
+const indexPath = () => cacheIndexPath({ env: env(), home, creds: resolveCredentials({ env: env(), cwd: project, home }) });
 const readIndex = () => JSON.parse(readFileSync(indexPath(), "utf8"));
 
 // 默认预算给得很宽（15 s / 60 s），墙钟不参与任何一条断言的判定：`node --test tests/*.test.mjs`
@@ -490,10 +497,81 @@ describe("TTL 与并发", () => {
   });
 });
 
+describe("异常成功响应（HTTP 200 但形状不对）", () => {
+  // 回归锚点：`body?.items ?? []` 把 HTTP 200 的 `{}` 当成"完整的空集"，于是那次全量
+  // 把索引清空、水位回退到本地时钟、stale 标记消失——一次畸形响应伪装成"刷新成功且项目里啥也没有"。
+  test("全量返回 {}：不得当成完整空快照提交，旧快照原样保留并记 stale", async () => {
+    const seeded = seedIndex();
+    handler = (url) => (url.pathname === "/api/v1/rooms" ? { body: ROOMS } : { body: {} });
+
+    const r = await run();
+    assert.equal(r.status, "stale", "畸形响应不得报成功");
+    const doc = readIndex();
+    assert.deepEqual(doc.items, seeded.items, "旧 items 一条都不能少");
+    assert.equal(doc.serverTime, seeded.serverTime, "水位不得推进");
+    assert.match(doc.stale.reason, /items/, `失败原因要点明缺 items，实得:${doc.stale.reason}`);
+  });
+
+  test("items 不是数组（给了对象）：同样拒收", async () => {
+    const seeded = seedIndex();
+    handler = (url) => (url.pathname === "/api/v1/rooms" ? { body: ROOMS } : { body: { items: {}, serverTime: FULL_SERVER_TIME } });
+
+    const r = await run();
+    assert.equal(r.status, "stale");
+    assert.deepEqual(readIndex().items, seeded.items);
+  });
+
+  test("合法的空集仍要正常收下：items 为空数组不是错误", async () => {
+    // fullPulledAt 拉到 24 h 之外，强制走全量——只有全量才会整体覆盖 items，
+    // 增量的空集本来就该合进旧快照（那是另一条路径，不在本用例的判定范围）。
+    seedIndex({ fullPulledAt: iso(NOW - 2 * FULL_INTERVAL_MS) });
+    handler = (url) =>
+      url.pathname === "/api/v1/rooms" ? { body: ROOMS } : { body: { serverTime: FULL_SERVER_TIME, nextCursor: "", items: [] } };
+
+    const r = await run();
+    assert.equal(r.status, "refreshed", "空数组是合法响应，不能跟畸形响应混为一谈");
+    assert.deepEqual(readIndex().items, {});
+    assert.equal(readIndex().stale, undefined, "成功的空集不该留 stale 标记");
+  });
+});
+
+describe("响应体也要受预算约束", () => {
+  // 回归锚点：clearTimeout 曾放在 fetch 的 finally 里，headers 一到 timer 就被清掉，
+  // 之后 response.json() 想等多久等多久——宣称的单请求 / 总预算对 body 完全不生效。
+  test("headers 已回但 body 挂住：按超时处理，不得报 refreshed", async () => {
+    const seeded = seedIndex();
+    handler = (url) => (url.pathname === "/api/v1/rooms" ? { body: ROOMS } : "headers-then-hang");
+
+    const r = await run({ requestTimeoutMs: 150, totalBudgetMs: 600 });
+    assert.equal(r.status, "stale", "body 超预算必须落进 stale，而不是被当成成功");
+    assert.deepEqual(readIndex().items, seeded.items);
+  });
+});
+
+describe("缓存身份隔离", () => {
+  // 回归锚点：缓存曾只按 hostname 切分，于是 127.0.0.1:4011 与 :4012 共用一个文件——
+  // B 项目首次刷新直接命中 fresh、0 次请求，读到的却是 A 的标题。同 host 换一枚权限不同的
+  // token 也一样不重置身份。
+  test("同 host 不同端口 / 不同 token → 各自独立的缓存文件", () => {
+    const e = env();
+    const paths = [
+      { baseUrl: "http://127.0.0.1:4011", token: "wfp_a" },
+      { baseUrl: "http://127.0.0.1:4012", token: "wfp_a" },
+      { baseUrl: "http://127.0.0.1:4011", token: "wfp_b" },
+    ].map((c) => cacheIndexPath({ env: e, home, creds: { ok: true, host: "127.0.0.1", ...c } }));
+
+    assert.equal(new Set(paths).size, 3, `三者必须互不相同，实得:\n${paths.join("\n")}`);
+    for (const p of paths) {
+      assert.doesNotMatch(p, /wfp_/, "token 不得出现在文件名里");
+    }
+  });
+});
+
 describe("离线 / 超时（退出码 0，沿用旧快照）", () => {
   test("端口不通：一行 stderr，有快照则标 stale 且 items 不动", async () => {
-    const seeded = seedIndex();
+    // 先改配置再播种：缓存身份含 baseUrl，改了端口就是另一个身份，旧快照本就不该被读到。
     writeFileSync(join(home, ".config/workflow/config.toml"), '[profiles.sandbox]\nbase_url = "http://127.0.0.1:1"\ntoken = "wfp_sandbox00"\n');
+    const seeded = seedIndex();
     const r = await run();
     assert.equal(r.status, "stale");
     assert.equal(r.logs.length, 1);

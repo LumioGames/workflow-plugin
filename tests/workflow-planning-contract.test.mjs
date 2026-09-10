@@ -120,10 +120,15 @@ test("按独立交付拓扑拆单，并按变更类型选择质量路径", () =>
     "测试与验证设计",
     "共享合同与公共底座",
     "程序实现与内容生产",
-    "集成候选与整体 Review",
+    "合入与合入后审查",
     "最终 QA 与领域验收",
   ]);
-  assert.match(process, /最终合入受保护分支、发布或状态完成前/);
+  // 冻结口径是「合入后审」：本 reference 是 planning 强制读取的文件，
+  // 它曾要求「最终合入前对完整 diff 做整体 Review」——比主规则更严的另一道门。
+  // reference 只能展开方法，不能自立闸门。
+  assert.match(process, /审查发生在合入之后，不在合入之前/);
+  assert.match(process, /不挡合入/);
+  assert.doesNotMatch(process, /最终合入受保护分支、发布或状态完成前/);
   assert.match(process, /场景、Prefab、关卡、二进制资产.*唯一所有者/);
   assert.match(process, /不得制造无关失败或伪造测试输出/);
   assert.match(process, /没有可自动化测试缝/);
@@ -230,7 +235,12 @@ test("规划技能保持上下文预算：强制读取的文件不得无限膨�
     ...listFiles(overlayDir).map((file) => Buffer.byteLength(readFileSync(file, "utf8"), "utf8")),
   );
 
-  const budget = 30_000;
+  // 1.2.0 上调到 30_500：planning-process.md 是本技能**强制读取**的文件，而它原先写着
+  // 「最终合入受保护分支前做整体 Review」与「对可自动化代码行为一律 Red-Green-Refactor」——
+  // 两道比冻结口径更严的门。改成合入后审 + TDD 按需用，措辞要同时讲清「做什么」与「不再是门」，
+  // 比原文长。加之前已按「先删冗余」压过两轮。
+  // 预算保留：它防的是无意识膨胀，不是禁止修正错误口径。
+  const budget = 30_500;
   assert.ok(
     mandatory + largestOverlay < budget,
     `单次规划需加载 ${mandatory + largestOverlay} 字节，超出预算 ${budget}——新增内容应放进按需读取的 references`,

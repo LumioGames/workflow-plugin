@@ -1,6 +1,6 @@
 {
   "name": "workflow",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "让 AI Agent 直连 Workflow（workflow.games）：本地优先规划与拆解需求、自动查重和补全依赖、按权限模式受控并发上传、规划需求与需求室、记 bug、查任务、拿单执行与证据回写、跨仓库交接纪要、线上 QA 验收、查文档、经确认后向平台方匿名反馈问题与建议",
   "author": {
     "name": "Workflow",

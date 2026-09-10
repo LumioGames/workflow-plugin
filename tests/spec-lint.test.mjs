@@ -180,17 +180,18 @@ describe('链接与 @import', () => {
 })
 
 describe('agents / skills / 软链', () => {
-  test('agents 允许 disallowedTools(行内或块列表),多出其它键或 name 不一致被抓', async () => {
+  test('agents 允许 tools / disallowedTools(行内或块列表),多出其它键或 name 不一致被抓', async () => {
     const ok = await lint(specFixture({
-      '.spec/agents/reviewer.agent.md': '---\nname: reviewer\ndescription: 审\ndisallowedTools:\n  - Bash\n---\n',
+      '.spec/agents/reviewer.agent.md': '---\nname: reviewer\ndescription: 审\ntools: ["Read", "Grep"]\ndisallowedTools:\n  - Bash\n---\n',
       '.spec/agents/plain.md': '---\nname: plain\ndescription: 平\ndisallowedTools: [Bash]\n---\n',
     }))
     assert.equal(status(ok, 'agents-frontmatter'), 'ok', formatReport(ok))
+    // tools 是宿主官方字段（工具白名单），不再算规范外；反例换成真正不被宿主据以调度的键。
     const bad = await lint(specFixture({
-      '.spec/agents/coder.agent.md': '---\nname: other\ndescription: 写\ntools: Bash\n---\n',
+      '.spec/agents/coder.agent.md': '---\nname: other\ndescription: 写\nrole: implementer\n---\n',
     }))
     const out = messages(bad, 'agents-frontmatter').join('\n')
-    assert.match(out, /多出:tools/)
+    assert.match(out, /多出:role/)
     assert.match(out, /name「other」与文件名「coder」不一致/)
   })
 

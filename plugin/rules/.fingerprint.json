@@ -5,8 +5,7 @@
     "编码约定",
     "宿主差异",
     "协作 / 调度",
-    "安全 / 外发",
-    "工程"
+    "安全 / 外发"
   ],
   "lines": {
     "042da7f15f40c85f039596cced89e49d289cd7c0": "rules/dispatch.md:1",
@@ -63,7 +62,7 @@
     "d5c46789112d80b227f24830b748e8fab737cb0c": "rules/system.md:4",
     "f48300028b1d254656f37dd837133b4a241e2cb0": "rules/system.md:5",
     "ea1ab3c131ecdbedaffb714ac947e2d6a577e92f": "rules/system.md:9",
-    "bee7d999ccb151a6d845cd6b2cbbb2234b3d7d83": "rules/system.md:10",
+    "75a7df01d0f37565e9b59276416c49f71fa6dad7": "rules/system.md:10",
     "00959a2902b26f2adfda04bda83f510a62578e8a": "rules/system.md:11",
     "5120926a32348529c97c9a0a4c2f775f5aba7206": "rules/system.md:15",
     "83077f82eac9f4ce2d6ce9e97cdf66230ab22b60": "rules/system.md:16",

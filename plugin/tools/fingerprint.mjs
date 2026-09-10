@@ -14,8 +14,9 @@
  * 后残留的空格不该影响比对);
  * 只收归一化后 ≥ 12 字的行(短行到处都是,不构成「抄」的证据)。
  *
- * 保留标题默认表(可用 --reserved 覆盖):调度核心、编码约定、宿主差异、协作 / 调度、安全 / 外发、工程
- * ——这些是插件规则的节名,项目文件里出现即报,不看正文。
+ * 保留标题默认表(可用 --reserved 覆盖):调度核心、编码约定、宿主差异、协作 / 调度、安全 / 外发
+ * ——这些是插件规则里足以指认插件的节名,项目文件里出现即报,不看正文。
+ * 通用单词(如「工程」)不入表:项目正当地用同名小节,不该被判成抄袭。
  */
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs'
@@ -25,7 +26,10 @@ import { fileURLToPath } from 'node:url'
 export const FINGERPRINT_API = 1
 export const MIN_LINE_CHARS = 12
 export const MIN_RUN = 3
-export const DEFAULT_RESERVED_HEADINGS = ['调度核心', '编码约定', '宿主差异', '协作 / 调度', '安全 / 外发', '工程']
+// 保留标题必须**足以指认插件**。「工程」这类单个通用词不合格:项目写一节自己的构建约定也叫
+// 「## 工程」,正文与插件毫无关系却照报——那不是「抄了插件」,是检查面自己在造误报。
+// 判据:标题要么是插件独有的组合词(调度核心 / 宿主差异),要么带插件语汇(协作 / 调度、安全 / 外发)。
+export const DEFAULT_RESERVED_HEADINGS = ['调度核心', '编码约定', '宿主差异', '协作 / 调度', '安全 / 外发']
 
 /** 去 markdown 标记与多余空白;返回可比对的纯文本行。 */
 export function normalizeLine(line) {

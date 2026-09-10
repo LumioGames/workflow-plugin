@@ -49,7 +49,7 @@ describe('生成器', () => {
     const { dir } = rulesFixture()
     const out = join(dir, 'out', '.fingerprint.json')
     const stdout = execFileSync(process.execPath, [GEN, 'generate', '--rules', join(dir, 'plugin-rules'), '--out', out], { encoding: 'utf8' })
-    assert.match(stdout, /3 行指纹,6 个保留标题/)
+    assert.match(stdout, /3 行指纹,5 个保留标题/)
     const first = readFileSync(out, 'utf8')
     const fp = JSON.parse(first)
     assert.equal(fp.api, FINGERPRINT_API)
@@ -115,9 +115,32 @@ describe('core 接线', () => {
     assert.match(fpFindings[0], /项目抄了插件保留段:标题「调度核心」/)
     assert.match(fpFindings[1], /连续 3 行与插件规则逐字相同\(始于插件 plugin-rules\/dispatch\.md:5\)/)
     assert.match(fpFindings[2], /标题「宿主差异」/)
-    assert.equal(result.checks.find((c) => c.id === 'fingerprint').scanned, 3)
+    assert.equal(result.checks.find((c) => c.id === 'fingerprint').scanned, 4, '扫描面含仓根 CLAUDE.md')
     assert.equal(result.checks.at(-1).id, 'fingerprint', '指纹永远是最后一项')
-    assert.match(formatReport(result), /指纹 .*扫描 3 个文件.*3 处命中/)
+    assert.match(formatReport(result), /指纹 .*扫描 4 个文件.*3 处命中/)
+  })
+
+  test('原样抄进仓根 CLAUDE.md 也要报——它才是 Claude Code 的实际生效入口', async () => {
+    // 回归锚点：扫描面原先只有 .spec/AGENTS.md、.spec/rules/、仓根 AGENTS.md。
+    // 把整段插件规则抄进 CLAUDE.md 是零命中的，而 Claude Code 读的恰恰是 CLAUDE.md。
+    const { dir, fpFile } = rulesFixture()
+    const root = specFixture({ 'CLAUDE.md': `# 入口\n\n## 调度核心\n\n${RULE_LINES.join('\n')}\n` })
+    const result = await runSpecLint({ root, fingerprint: fpFile })
+    cleanup(root); cleanup(dir)
+
+    const hits = result.findings.filter((f) => f.check === 'fingerprint').map((f) => `${f.file}: ${f.message}`)
+    assert.ok(hits.some((h) => h.startsWith('CLAUDE.md:3')), `CLAUDE.md 的保留标题应被抓到:${hits.join(' | ')}`)
+    assert.ok(hits.some((h) => /CLAUDE\.md:5-7.*连续 3 行/.test(h)), `CLAUDE.md 的逐字复制应被抓到:${hits.join(' | ')}`)
+  })
+
+  test('「工程」这类通用标题不在保留表里——项目正当地用同名小节不该被判成抄袭', async () => {
+    const { dir, fpFile } = rulesFixture()
+    const root = specFixture({ '.spec/rules/system.md': '# 项目规则\n\n## 工程\n\n本项目用 Cargo 构建,提交前跑 cargo clippy 与 cargo test。\n' })
+    const result = await runSpecLint({ root, fingerprint: fpFile })
+    cleanup(root); cleanup(dir)
+
+    const hits = result.findings.filter((f) => f.check === 'fingerprint')
+    assert.deepEqual(hits, [], `与插件无关的「工程」小节不该命中:${hits.map((h) => h.message).join(' | ')}`)
   })
 
   test('插件未提供指纹文件 → 本项跳过而不是报错;指纹文件坏了 → 报错', async () => {

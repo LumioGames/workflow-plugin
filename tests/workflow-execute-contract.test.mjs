@@ -385,12 +385,15 @@ describe("ops 扩充：重开与层级", () => {
 });
 
 describe("上下文预算", () => {
-  test("execute 主线（SKILL + 流程 + 交回 + 读单 + 搜索）不超过 37KB", () => {
+  test("execute 主线（SKILL + 流程 + 交回 + 读单 + 搜索）不超过 37.5KB", () => {
     // 0.5.0 新增三块硬纪律（开工前梳理讨论、并行子 Agent、完成三件套）后上调到 32KB；
     // 0.9.0 加入第四件硬性交付（交接纪要：写模板 + 读单第六路 + agentLabel 纪律）后
     // 上调到 37KB——加之前先按「逼近上限先删冗余」压过一轮，重复口径改成指针。
+    // 1.2.0 区分「主 loop 模式 / 被派的 worker 模式」后上调到 37.5KB：worker 不得再派子 Agent
+    // 是 rules/system.md 的硬红线，而本技能原先无条件鼓励并行，叶子 worker 照做必然失败。
+    // 同样先压过一轮：SKILL 第 6 步的并行纪律清单原样重复了 flow 第六节，已改成纯指针。
     // 预算本身保留：它防的是无意识膨胀，不是禁止有意识的新纪律。
     const total = [skill, flow, handoff, readCard, searchRef].reduce((sum, text) => sum + Buffer.byteLength(text, "utf8"), 0);
-    assert.ok(total < 37000, `执行主线上下文 ${total} 字节，超出 37KB 预算`);
+    assert.ok(total < 37500, `执行主线上下文 ${total} 字节，超出 37.5KB 预算`);
   });
 });

@@ -12,6 +12,7 @@
  * token 只在返回对象里流转，绝不写进任何消息。
  */
 import { existsSync, readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 
@@ -138,16 +139,36 @@ export function cacheIndexDir({ env = process.env, home = homedir() } = {}) {
   return join(xdg || join(home, '.cache'), 'workflow', 'index')
 }
 
-/** 某个 host 的索引文件路径：<cacheIndexDir>/<host>.json。 */
-export function cacheIndexPath({ env = process.env, home = homedir(), host } = {}) {
-  return join(cacheIndexDir({ env, home }), `${host}.json`)
+/**
+ * 索引缓存的身份键：hostname 之外还要区分端口与凭据范围。
+ * 只按 hostname 切分时,127.0.0.1:4011 与 :4012 共用一个文件,B 项目会直接读到 A 的标题;
+ * 同一 host 上换一枚权限不同的 token 也不会重置缓存,于是"看得见的类型"跟着旧 token 走。
+ * 指纹取 sha256(baseUrl + token) 前 8 位:单向、不可逆推,且 token 本身不进文件名、不进日志。
+ */
+export function cacheIdentity({ baseUrl = '', token = '' } = {}) {
+  return createHash('sha256').update(`${baseUrl}\u0000${token}`).digest('hex').slice(0, 8)
+}
+
+/**
+ * 某个凭据的索引文件路径：<cacheIndexDir>/<host>-<身份指纹>.json。
+ * 传 creds（resolveCredentials 的返回）时按完整身份分区；只传 host 时退化为旧的
+ * <host>.json —— 仅供读取历史快照，不要用于写入。
+ */
+export function cacheIndexPath({ env = process.env, home = homedir(), host, creds } = {}) {
+  const dir = cacheIndexDir({ env, home })
+  if (!creds?.ok) return join(dir, `${host}.json`)
+  const port = (() => { try { return new URL(creds.baseUrl).port } catch { return '' } })()
+  const hostPart = port ? `${creds.host}_${port}` : creds.host
+  return join(dir, `${hostPart}-${cacheIdentity(creds)}.json`)
 }
 
 /** 读索引文件；不存在或损坏都返回 null（损坏视同无快照，由刷新走全量覆盖）。 */
 export function readIndexFile(path) {
   try {
     const doc = JSON.parse(readFileSync(path, 'utf8'))
-    if (!doc || typeof doc !== 'object' || doc.api !== 1 || typeof doc.items !== 'object') return null
+    // typeof null === 'object':不显式排掉 null 与数组,坏快照会一路混到 Object.values 才炸。
+    if (!doc || typeof doc !== 'object' || doc.api !== 1) return null
+    if (!doc.items || typeof doc.items !== 'object' || Array.isArray(doc.items)) return null
     return doc
   } catch {
     return null

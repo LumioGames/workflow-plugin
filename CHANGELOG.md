@@ -2,6 +2,79 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.0]
+
+第二轮收敛：**修掉插件自相矛盾的指令、把只读做成能力边界、让便利功能不再能干掉硬规则。**
+
+这些问题来自一次外部独立评审。每一条都在源码里复核过，并配了会真的失败的回归测试——
+不是照单全收结论。
+
+### 硬规则不再会无声消失
+
+- `readIndexFile` 用 `typeof doc.items !== 'object'` 判形状，而 `typeof null === 'object'`，
+  于是 `items: null` 的坏缓存一路混到 `Object.values` 才抛。那次抛发生在 `buildAdditionalContext`
+  里且没人接，结果是 **hook exit 1、stdout 0 字节，两份常驻规则一起无声消失**。
+  现在形状校验显式排掉 null 与数组；索引与旧插件检测各自捕获异常；`main()` 再兜一层——
+  便利索引怎么坏，规则都照常注入。
+- 索引一行的 Room 计数封顶 5 个，其余折成计数（100 个 Room 实测曾串成 1410 字符、0 换行）。
+- 环境变量覆盖了 `.workflow` 目录绑定时，索引行必须说出覆盖来源——不再把 A 项目的摘要
+  伪装成 B 项目的上下文。
+
+### 只读落到能力边界
+
+- `reviewer` 改用宿主官方的 `tools: ["Read", "Grep", "Glob"]` 白名单。此前只有
+  `disallowedTools: Bash`，而**没有 Bash 并不等于没有 Edit / Write**——「写的人 ≠ 审的人」
+  只剩自觉。`plugin-lint` 与 `spec-lint` 此前都把 `tools` 判为规范外字段，正好挡住了这个修法，
+  两处一并放开；`plugin-lint` 新增校验：reviewer 必须有 tools 白名单且其中不得含写入类工具。
+- `rules/system.md` 里「`tools` 写了不生效」这句话是错的，已改正。
+
+### 索引不再把畸形响应当成功
+
+- `/sync/changes` 返回 HTTP 200 的 `{}` 时，`body?.items ?? []` 会把它当成「完整的空集」，
+  于是那次全量清空索引、水位回退到本地时钟、stale 标记消失——一次畸形响应伪装成
+  「刷新成功且项目里什么都没有」。现在缺 `items` 数组即拒收，保留旧快照并如实记失败。
+- 响应体消费纳入同一超时预算：`clearTimeout` 此前放在 fetch 的 `finally` 里，headers 一到
+  timer 就被清掉，之后 `response.json()` 想等多久等多久。
+- 索引缓存按 **origin + 凭据指纹**分区，不再只按 hostname：`127.0.0.1:4011` 与 `:4012`
+  此前共用一个文件，同 host 换一枚权限不同的 token 也不重置。token 本身不进文件名。
+- 「检测到 lumioagentspec 仍启用」不再把「装了」当成「开着」：显式禁用的不再催卸载，
+  只在 `installed_plugins.json` 里出现的改说「检测到安装，未能确认是否启用」。
+
+### 同一件事不再有两套口径
+
+- `workflow-setup` 不再请用户把 token 粘贴到会话里，也不再自己读 `config.toml` 合并写回、
+  不再让用户「重发 token」核对——常驻规则写死了「凭据不得进 prompt」，「事后吊销」
+  替代不了「一开始就不进来」。写盘全部由用户在自己终端完成。
+- `planning-process.md`（planning **强制读取**的文件）此前要求「最终合入受保护分支前对完整
+  diff 做整体 Review」，比冻结的「合入后审、不挡合入」更严；同一文件还把 TDD 写成对所有
+  可自动化代码行为的强制门，与「方法技能按需用、推分支前不要求跑任何命令」冲突。两处均已
+  改回，并写明 reference 只展开方法、不另立闸门。
+- `workflow-execute` 区分**主 loop 模式**与**被派的 worker 模式**：worker 不得再派子 Agent
+  （`rules/system.md` 硬红线，宿主层面也 spawn 不了），规模超限就交回由主 loop 重拆。
+  此前正文无条件鼓励并行子 Agent，叶子 worker 照做必然失败。
+- `workflow-ops` 补上 G5 授权例外段。execute / qa / planning 都有，**只有 ops 漏了**——
+  它的 description 明写能做状态流转，同文件的 G5 却把状态流转列为停止条件。
+
+### 内容错误
+
+- `test-driven-development` 的两段 Good 示例合起来编译不过：回调是同步的（返回 `string`），
+  签名却是 `() => Promise<T>`。实测 `tsc 5.8.3 --strict` 报 TS2345、exit 2。签名放宽为
+  `() => T | Promise<T>` 后 exit 0。
+- `systematic-debugging` 删掉无来源的「95% 的查不出根因是调查没做完」；「3 次失败 = 架构问题」
+  改成「停止试错、升级诊断的**程序阈值**」，并写明计数按**同一个根因**算——三个互不相干的
+  失败累加起来不构成这个信号。
+- 指纹检查补扫仓根 `CLAUDE.md`（它才是 Claude Code 的实际生效入口，此前只扫 `AGENTS.md`，
+  把插件规则原样抄进 `CLAUDE.md` 是零命中）；保留标题去掉「工程」——单个通用词无论正文
+  写什么都报，项目正当地用同名小节会被误判成抄袭。
+
+### 两处上下文预算上调（均先压过冗余）
+
+- execute 主线 37KB → 37.5KB（主 loop / worker 身份区分）
+- planning 强制读取 30000 → 30500 字节（合入后审 + TDD 按需用的措辞要同时讲清「做什么」与
+  「不再是门」）
+
+预算保留：它防的是无意识膨胀，不是禁止修正错误口径。
+
 ## [1.1.0]
 
 仓库改成插件载荷独立成目录的布局：**装进用户机器的只有 `plugin/`**。

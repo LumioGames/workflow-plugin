@@ -7,7 +7,7 @@
 ## 协作 / 调度
 
 - **子 Agent 不得再派生别的子 Agent。** 调度权只在主 loop；被调用的子 Agent 只执行、不再派活（也符合宿主限制：subagent 不能再 spawn subagent）。
-- **子 Agent 的 frontmatter 只用 `name` + `description` + `disallowedTools`。** 其余（追求什么、用哪些技能、不做什么）写进正文；`role` / `goal` / `tools` 等不被宿主据以调度，写了不生效。
+- **子 Agent 的能力边界必须落到 frontmatter 的 `tools` 白名单，不能只写在正文里。** 只读角色就给只读工具集——没有 Bash 不等于没有 Write / Edit。frontmatter 只用 `name` + `description` + `tools` + `disallowedTools`；其余（追求什么、用哪些技能、不做什么）写进正文，`role` / `goal` 等不被宿主据以调度，写了不生效。
 - **改动若影响调度关系（增删子 Agent、改流程或技能分工），必须同步更新 [`dispatch.md`](dispatch.md)。** 漏更新 = 主 loop 调度依据失真。
 
 ## 工程

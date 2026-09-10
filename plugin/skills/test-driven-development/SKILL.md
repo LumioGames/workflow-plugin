@@ -89,7 +89,7 @@ test('retry works', async () => {
 
 <Good>
 ```typescript
-async function retryOperation<T>(fn: () => Promise<T>): Promise<T> {
+async function retryOperation<T>(fn: () => T | Promise<T>): Promise<T> {
   for (let i = 0; i < 3; i++) {
     try {
       return await fn();
@@ -106,7 +106,7 @@ async function retryOperation<T>(fn: () => Promise<T>): Promise<T> {
 <Bad>
 ```typescript
 async function retryOperation<T>(
-  fn: () => Promise<T>,
+  fn: () => T | Promise<T>,
   options?: {
     maxRetries?: number;
     backoff?: 'linear' | 'exponential';

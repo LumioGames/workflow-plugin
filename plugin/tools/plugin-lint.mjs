@@ -13,8 +13,10 @@
  *     发布面是「装进用户机器的全部内容」,开发过程文件混进来会被原样下发。
  *  2. skills:skills/ 每个直接子目录都有 SKILL.md,frontmatter name 与目录名一致、description 非空;
  *     其余键限于 Agent Skills 标准的可选字段(license / allowed-tools / metadata / version)。
- *  3. agents:agents/*.md 的 frontmatter 只允许 name + description + disallowedTools,name 与文件名一致;
- *     reviewer.md 若存在,disallowedTools 必须含 Bash(reviewer 只读、只出报告,不跑命令)。
+ *  3. agents:agents/*.md 的 frontmatter 只允许 name + description + tools + disallowedTools,name 与文件名一致;
+ *     reviewer.md 若存在,必须落实**只读能力集**:tools 白名单里不得含写入类工具(Write / Edit /
+ *     NotebookEdit / Bash),且仍要 disallowedTools 含 Bash。只靠提示词说"我不写"不算数——
+ *     没有 Bash 并不自动移除 Edit / Write。
  *  4. commands:commands/*.md 必须有 frontmatter 且 description 非空(宿主据此列出 / 命令)。
  *  5. hooks:hooks/hooks.json 可解析;不得注册 PreToolUse(commit 阻断钩子已移除);
  *     SessionStart 命令里 ${CLAUDE_PLUGIN_ROOT}/<script> 指向的脚本必须存在(写错不报错,只会让规则静默缺席)。
@@ -32,7 +34,9 @@ import { walk, parseFrontmatter, mdLinks } from './spec-lint/lib.mjs'
 
 export const BANNED_RULE_WORDS = ['契约卡', 'wave', '.spec/tasks', '收口门槛', '铁律', 'in_progress']
 const SKILL_ALLOWED_KEYS = new Set(['name', 'description', 'license', 'allowed-tools', 'metadata', 'version'])
-const AGENT_ALLOWED_KEYS = new Set(['name', 'description', 'disallowedTools'])
+// tools 是 Claude Code 官方支持的工具白名单(默认继承全部工具,最小权限是官方建议做法)。
+// Agent Plugins 1.0.0 §7 只定义 Skills 与 MCP,不管 agents/,所以这里没有双标准冲突。
+const AGENT_ALLOWED_KEYS = new Set(['name', 'description', 'tools', 'disallowedTools'])
 
 /** 跑全部校验,返回错误列表(相对 root 的 `file: msg`)。 */
 export function pluginLint(root) {
@@ -83,8 +87,18 @@ export function pluginLint(root) {
       const unknown = fm.__keys.filter((k) => !AGENT_ALLOWED_KEYS.has(k))
       if (unknown.length) err(file, `frontmatter 只允许 name + description + disallowedTools,多出:${unknown.join(', ')}`)
       if (fm.name && fm.name !== base) err(file, `frontmatter name「${fm.name}」与文件名「${base}」不一致`)
-      if (base === 'reviewer' && !/\bBash\b/.test(fm.disallowedTools ?? '')) {
-        err(file, 'reviewer 的 frontmatter 必须含 disallowedTools: Bash(只读、只出报告,不跑命令)')
+      if (base === 'reviewer') {
+        if (!/\bBash\b/.test(fm.disallowedTools ?? '')) {
+          err(file, 'reviewer 的 frontmatter 必须含 disallowedTools: Bash(只读、只出报告,不跑命令)')
+        }
+        // 只读必须落到能力集:没有 Bash 不等于没有 Edit / Write。
+        const tools = fm.tools ?? ''
+        if (!tools) {
+          err(file, 'reviewer 必须用 tools 白名单落实只读(如 ["Read", "Grep", "Glob"]),仅靠提示词不算')
+        } else {
+          const writers = ['Write', 'Edit', 'NotebookEdit', 'Bash'].filter((t) => new RegExp(`\\b${t}\\b`).test(tools))
+          if (writers.length) err(file, `reviewer 的 tools 白名单里出现写入类工具:${writers.join(', ')}`)
+        }
       }
     }
   }

@@ -143,13 +143,20 @@ describe("workflow-dispatch 边界", () => {
 });
 
 describe("agents/reviewer.md", () => {
-  test("frontmatter 只含 name / description / disallowedTools，且 disallowedTools 为 Bash", () => {
+  test("frontmatter 用 tools 白名单把只读做实，且仍禁 Bash", () => {
     const fm = /^---\n([\s\S]*?)\n---/.exec(reviewer);
     assert.ok(fm, "frontmatter 缺失");
     const keys = fm[1].split("\n").map((line) => line.split(":", 1)[0].trim());
-    assert.deepEqual(keys, ["name", "description", "disallowedTools"]);
+    assert.deepEqual(keys, ["name", "description", "tools", "disallowedTools"]);
     assert.match(fm[1], /^name: reviewer$/m);
     assert.match(fm[1], /^disallowedTools: Bash$/m);
+    // 只读必须是能力边界而非提示词承诺：没有 Bash 并不自动移除 Edit / Write。
+    const tools = /^tools: (.+)$/m.exec(fm[1])?.[1];
+    assert.ok(tools, "reviewer 必须声明 tools 白名单");
+    for (const writer of ["Write", "Edit", "NotebookEdit", "Bash"]) {
+      assert.doesNotMatch(tools, new RegExp(`\\b${writer}\\b`), `tools 白名单里不得出现写入类工具 ${writer}`);
+    }
+    assert.match(tools, /\bRead\b/, "reviewer 至少要能 Read");
     const description = /^description: (.+)$/m.exec(fm[1])?.[1];
     assert.ok(description?.length > 20, "description 过短");
     assert.match(description, /合入[\s\S]*只读|只读[\s\S]*合入/);

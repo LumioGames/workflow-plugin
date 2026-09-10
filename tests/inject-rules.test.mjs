@@ -7,7 +7,7 @@
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,7 @@ import {
   buildRulesContext,
   detectLegacyPlugin,
 } from "../plugin/tools/inject-rules.mjs";
+import { cacheIndexPath, resolveCredentials } from "../plugin/tools/lib/workflow-config.mjs";
 
 const script = join(dirname(fileURLToPath(import.meta.url)), "..", "plugin", "tools/inject-rules.mjs");
 
@@ -34,7 +35,10 @@ function writeJson(path, value) {
 }
 
 function writeIndex(doc) {
-  writeJson(join(cacheHome, "workflow/index", `${HOST}.json`), doc);
+  // 不硬编码缓存文件名：身份键含端口与凭据指纹，让被测实现自己算路径。
+  const creds = resolveCredentials({ env: baseEnv(), cwd: project, home });
+  assert.ok(creds.ok, `fixture 凭据应可解析，实得 ${creds.reason}`);
+  writeJson(cacheIndexPath({ env: baseEnv(), home, creds }), doc);
 }
 
 function baseEnv(extra = {}) {
@@ -111,7 +115,8 @@ describe("索引一行", () => {
       },
     });
     const line = buildIndexLine({ env: baseEnv(), cwd: project, home, now: () => now });
-    assert.match(line, new RegExp(`线上单据索引在 .*workflow/index/${HOST.replace(/\./g, "\\.")}\\.json：3 张（RM-00001 2 / RM-00002 1），7 分钟前刷新`));
+    // 文件名带凭据身份指纹（区分端口与 token 范围），这里只钉 host 段与其后的 8 位十六进制。
+    assert.match(line, new RegExp(`线上单据索引在 .*workflow/index/${HOST.replace(/\./g, "\\.")}-[0-9a-f]{8}\\.json：3 张（RM-00001 2 / RM-00002 1），7 分钟前刷新`));
     assert.match(line, /只用来找单号和 Room，状态以线上为准/);
     assert.doesNotMatch(line, /标题一/, "索引正文不得注入");
     assert.doesNotMatch(line, /离线沿用/);
@@ -148,31 +153,127 @@ describe("索引一行", () => {
   });
 });
 
+describe("失败域隔离：便利索引坏掉不得抹掉硬规则", () => {
+  // 回归锚点：readIndexFile 曾用 typeof doc.items !== "object" 判形状，而 typeof null === "object"，
+  // 于是 items:null 一路混到 Object.values 才抛——那次抛发生在 buildAdditionalContext 里，
+  // 结果是 exit 1、stdout 0 字节，两份硬红线一起无声消失。
+  const brokenCaches = {
+    "items 为 null": { api: 1, items: null, refreshedAt: "2026-09-10T09:53:00Z" },
+    "items 是数组": { api: 1, items: [], refreshedAt: "2026-09-10T09:53:00Z" },
+    "整个文件不是 JSON": "{ not json",
+  };
+
+  for (const [name, doc] of Object.entries(brokenCaches)) {
+    test(`${name} → 规则照常注入，索引降级成一行说明`, () => {
+      const creds = resolveCredentials({ env: baseEnv(), cwd: project, home });
+      const p = cacheIndexPath({ env: baseEnv(), home, creds });
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, typeof doc === "string" ? doc : JSON.stringify(doc));
+
+      const text = buildAdditionalContext({ pluginRoot, env: baseEnv(), cwd: project, home });
+      assert.match(text, /# System Rules/, "硬规则必须仍在场");
+      assert.match(text, /# Dispatch Rules/, "硬规则必须仍在场");
+      assert.match(text, /线上单据索引/, "索引失败要说一句，不能装作没这回事");
+
+      rmSync(join(cacheHome, "workflow"), { recursive: true, force: true });
+    });
+  }
+
+  test("子进程实跑：坏缓存下退出码仍为 0、stdout 是合法 JSON", () => {
+    const creds = resolveCredentials({ env: baseEnv(), cwd: project, home });
+    const p = cacheIndexPath({ env: baseEnv(), home, creds });
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, JSON.stringify({ api: 1, items: null }));
+
+    // 这里要的是原始退出码，所以不走 runScript（它会 JSON.parse 并在非零时直接抛）。
+    const r = spawnSync(process.execPath, [script], { cwd: project, env: baseEnv(), encoding: "utf8" });
+    assert.equal(r.status, 0, `坏缓存不得让 hook 非零退出，stderr=${r.stderr}`);
+    assert.ok(r.stdout.length > 0, "stdout 不得为空——空输出等于规则整段缺席");
+    const parsed = JSON.parse(r.stdout);
+    assert.match(parsed.hookSpecificOutput.additionalContext, /# System Rules/);
+
+    rmSync(join(cacheHome, "workflow"), { recursive: true, force: true });
+  });
+});
+
+describe("Room 计数封顶", () => {
+  test("Room 很多时只点名前 5 个，其余折成计数（常驻成本不随 Room 数线性涨）", () => {
+    const items = {};
+    for (let i = 1; i <= 40; i++) {
+      items[`R-${String(i).padStart(5, "0")}`] = {
+        type: "requirement",
+        room: `RM-${String(i).padStart(5, "0")}`,
+        title: "t",
+        status: "x",
+        updatedAt: "2026-09-01T00:00:00Z",
+      };
+    }
+    writeIndex({ api: 1, host: HOST, serverTime: "2026-09-10T09:50:00Z", refreshedAt: "2026-09-10T09:53:00Z", rooms: {}, items });
+    const line = buildIndexLine({ env: baseEnv(), cwd: project, home });
+
+    assert.match(line, /40 张/, "总数仍要如实报");
+    assert.match(line, /另 35 个 Room/, "其余折成计数");
+    assert.equal((line.match(/RM-/g) ?? []).length, 5, "最多点名 5 个 Room");
+    assert.ok(line.length < 400, `索引一行不该失控，实测 ${line.length} 字符`);
+
+    rmSync(join(cacheHome, "workflow"), { recursive: true, force: true });
+  });
+});
+
+describe("env 覆盖目录绑定要明示", () => {
+  test("目录有 .workflow 但 env 生效 → 索引行必须说出覆盖来源", () => {
+    const env = baseEnv({
+      WORKFLOW_API_BASE: "https://other.example.test/api/v1",
+      WORKFLOW_TOKEN: "wfp_envtoken0",
+    });
+    const creds = resolveCredentials({ env, cwd: project, home });
+    assert.equal(creds.source, "env", "env 优先于 marker 是既定口径");
+    writeJson(cacheIndexPath({ env, home, creds }), {
+      api: 1, host: "other.example.test", serverTime: "2026-09-10T09:50:00Z",
+      refreshedAt: "2026-09-10T09:53:00Z", rooms: {}, items: {},
+    });
+
+    const line = buildIndexLine({ env, cwd: project, home });
+    assert.match(line, /环境变量.*覆盖/, "不能把 A 的摘要伪装成 B 的项目上下文");
+    assert.match(line, /other\.example\.test/, "要点名实际来源");
+
+    rmSync(join(cacheHome, "workflow"), { recursive: true, force: true });
+  });
+});
+
 describe("lumioagentspec 共存警告", () => {
   test("settings.json 的 enabledPlugins 里 lumio@lumioagentspec 为 true → 警告", () => {
     const h = join(sandbox, "home-enabled");
     writeJson(join(h, ".claude/settings.json"), { enabledPlugins: { "lumio@lumioagentspec": true, "workflow@workflow-plugin": true } });
-    assert.equal(detectLegacyPlugin({ home: h }), true);
+    assert.equal(detectLegacyPlugin({ home: h }), "enabled");
   });
 
-  test("enabledPlugins 里为 false 但 installed_plugins.json 仍有 lumioagentspec → 警告", () => {
-    const h = join(sandbox, "home-installed");
+  test("enabledPlugins 里显式为 false → 用户已关掉，不再催卸载", () => {
+    // 安装 ≠ 启用。显式关掉了还每次会话报「仍启用」，是在误报，且白付常驻成本。
+    const h = join(sandbox, "home-disabled");
     writeJson(join(h, ".claude/settings.json"), { enabledPlugins: { "lumio@lumioagentspec": false } });
     writeJson(join(h, ".claude/plugins/installed_plugins.json"), { version: 2, plugins: { "lumio@lumioagentspec": [{ scope: "user" }] } });
-    assert.equal(detectLegacyPlugin({ home: h }), true);
+    assert.equal(detectLegacyPlugin({ home: h }), null);
+  });
+
+  test("settings.json 没提到它、但 installed_plugins.json 里有 → 只说检测到安装，不断言启用", () => {
+    const h = join(sandbox, "home-installed");
+    writeJson(join(h, ".claude/settings.json"), { enabledPlugins: { "workflow@workflow-plugin": true } });
+    writeJson(join(h, ".claude/plugins/installed_plugins.json"), { version: 2, plugins: { "lumio@lumioagentspec": [{ scope: "user" }] } });
+    assert.equal(detectLegacyPlugin({ home: h }), "installed");
   });
 
   test("两个文件都没有 lumioagentspec → 不警告；文件缺失或损坏 → 静默不警告", () => {
     const clean = join(sandbox, "home-clean");
     writeJson(join(clean, ".claude/settings.json"), { enabledPlugins: { "workflow@workflow-plugin": true } });
     writeJson(join(clean, ".claude/plugins/installed_plugins.json"), { version: 2, plugins: { "workflow@workflow-plugin": [] } });
-    assert.equal(detectLegacyPlugin({ home: clean }), false);
+    assert.equal(detectLegacyPlugin({ home: clean }), null);
 
     const broken = join(sandbox, "home-broken");
     mkdirSync(join(broken, ".claude"), { recursive: true });
     writeFileSync(join(broken, ".claude/settings.json"), "{ not json");
-    assert.equal(detectLegacyPlugin({ home: broken }), false);
-    assert.equal(detectLegacyPlugin({ home: join(sandbox, "home-missing") }), false);
+    assert.equal(detectLegacyPlugin({ home: broken }), null);
+    assert.equal(detectLegacyPlugin({ home: join(sandbox, "home-missing") }), null);
   });
 });
 

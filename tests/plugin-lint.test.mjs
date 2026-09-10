@@ -75,21 +75,34 @@ describe('逐项', () => {
     ])
   })
 
-  test('agents:允许 disallowedTools(行内 / 块列表);reviewer 缺 Bash、多余键、name 不一致被抓', () => {
+  test('agents:tools / disallowedTools 都允许;name 不一致被抓', () => {
     const ok = lintFixture({
-      'agents/reviewer.md': '---\nname: reviewer\ndescription: 审\ndisallowedTools:\n  - Bash\n  - Write\n---\n',
+      'agents/reviewer.md': '---\nname: reviewer\ndescription: 审\ntools: ["Read", "Grep", "Glob"]\ndisallowedTools:\n  - Bash\n---\n',
       'agents/other.md': '---\nname: other\ndescription: 其它\ndisallowedTools: [Bash]\n---\n',
     })
     assert.deepEqual(ok, [])
-    const bad = lintFixture({
-      'agents/reviewer.md': '---\nname: reviewer\ndescription: 审\ntools: Read\n---\n',
-      'agents/x.md': '---\nname: y\ndescription: 审\n---\n',
-    })
-    assert.deepEqual(bad, [
-      'agents/reviewer.md: frontmatter 只允许 name + description + disallowedTools,多出:tools',
-      'agents/reviewer.md: reviewer 的 frontmatter 必须含 disallowedTools: Bash(只读、只出报告,不跑命令)',
+    assert.deepEqual(lintFixture({ 'agents/x.md': '---\nname: y\ndescription: 审\n---\n' }), [
       'agents/x.md: frontmatter name「y」与文件名「x」不一致',
     ])
+  })
+
+  test('reviewer 的只读必须落到 tools 白名单，不能只写在提示词里', () => {
+    // 没有 Bash ≠ 没有 Edit / Write。tools 是宿主官方的工具白名单字段（默认继承全部工具），
+    // 不设它就等于 reviewer 仍然能改代码——「写的人 ≠ 审的人」只剩自觉。
+    assert.deepEqual(
+      lintFixture({ 'agents/reviewer.md': '---\nname: reviewer\ndescription: 审\ndisallowedTools: Bash\n---\n' }),
+      ['agents/reviewer.md: reviewer 必须用 tools 白名单落实只读(如 ["Read", "Grep", "Glob"]),仅靠提示词不算'],
+    )
+
+    assert.deepEqual(
+      lintFixture({ 'agents/reviewer.md': '---\nname: reviewer\ndescription: 审\ntools: ["Read", "Write"]\ndisallowedTools: Bash\n---\n' }),
+      ['agents/reviewer.md: reviewer 的 tools 白名单里出现写入类工具:Write'],
+    )
+
+    assert.deepEqual(
+      lintFixture({ 'agents/reviewer.md': '---\nname: reviewer\ndescription: 审\ntools: ["Read", "Grep"]\n---\n' }),
+      ['agents/reviewer.md: reviewer 的 frontmatter 必须含 disallowedTools: Bash(只读、只出报告,不跑命令)'],
+    )
   })
 
   test('commands:缺 frontmatter 或缺 description 被抓', () => {

@@ -74,32 +74,37 @@ function makeClient({ apiBase, token, fetchImpl, deadline, now, requestTimeoutMs
     if (remaining <= 0) throw new RefreshError('总预算用尽')
     const controller = new AbortController()
     const clampedByBudget = remaining < requestTimeoutMs
+    const path = pathAndQuery.split('?')[0]
     const timer = setTimeout(() => controller.abort(), Math.min(requestTimeoutMs, remaining))
-    let response
+    // clearTimeout 必须晚于 response.json()：headers 一到就清掉 timer，body 就再不受这个
+    // 预算约束了——服务端把 body 挂住时，宣称的 5 s / 12 s 预算形同虚设（只剩宿主 15 s 外层兜底）。
     try {
-      response = await fetchImpl(apiBase + pathAndQuery, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-        signal: controller.signal,
-      })
-    } catch (error) {
-      const path = pathAndQuery.split('?')[0]
-      if (error?.name === 'AbortError') throw new RefreshError(clampedByBudget ? `总预算用尽（${path}）` : `请求超时：${path}`)
-      throw new RefreshError(`网络错误：${error?.message ?? error}`)
+      let response
+      try {
+        response = await fetchImpl(apiBase + pathAndQuery, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+          signal: controller.signal,
+        })
+      } catch (error) {
+        if (error?.name === 'AbortError') throw new RefreshError(clampedByBudget ? `总预算用尽（${path}）` : `请求超时：${path}`)
+        throw new RefreshError(`网络错误：${error?.message ?? error}`)
+      }
+      if (!response.ok) {
+        throw new RefreshError(`HTTP ${response.status}：${path}`, { status: response.status })
+      }
+      let body
+      try {
+        body = await response.json()
+      } catch (error) {
+        if (error?.name === 'AbortError') throw new RefreshError(clampedByBudget ? `总预算用尽（${path}）` : `响应体超时：${path}`)
+        throw new RefreshError(`响应不是 JSON：${path}`)
+      }
+      const dateHeader = response.headers?.get?.('date')
+      const serverDate = dateHeader ? Date.parse(dateHeader) : NaN
+      return { body, serverDate: Number.isFinite(serverDate) ? serverDate : null }
     } finally {
       clearTimeout(timer)
     }
-    if (!response.ok) {
-      throw new RefreshError(`HTTP ${response.status}：${pathAndQuery.split('?')[0]}`, { status: response.status })
-    }
-    let body
-    try {
-      body = await response.json()
-    } catch {
-      throw new RefreshError(`响应不是 JSON：${pathAndQuery.split('?')[0]}`)
-    }
-    const dateHeader = response.headers?.get?.('date')
-    const serverDate = dateHeader ? Date.parse(dateHeader) : NaN
-    return { body, serverDate: Number.isFinite(serverDate) ? serverDate : null }
   }
 }
 
@@ -144,6 +149,12 @@ async function pullChanges({ getJson, updatedSince, onChange }) {
       `types=${SYNC_TYPES}&limit=${PAGE_LIMIT}` +
       (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '')
     const { body, serverDate } = await getJson(query)
+    // HTTP 200 + 合法 JSON 不等于合法响应。冻结合同里 /sync/changes 必回 items 数组;
+    // 缺了它却按 `body?.items ?? []` 当空集处理,那次全量就会把索引清空、还把 stale 标记抹掉——
+    // 一次畸形响应伪装成"刷新成功且项目里什么都没有"。宁可保留旧快照并如实记失败。
+    if (!Array.isArray(body?.items)) {
+      throw new RefreshError(`响应缺 items 数组：${query.split('?')[0]}`)
+    }
     if (serverTime === null) {
       if (typeof body?.serverTime === 'string' && body.serverTime) serverTime = body.serverTime
       else if (serverDate) serverTime = isoMs(serverDate)
@@ -256,7 +267,7 @@ export async function refreshIndex({
     return { status: creds.reason === 'no-marker' ? 'no-marker' : 'no-credentials', reason: creds.reason }
   }
 
-  const path = cacheIndexPath({ env, home, host: creds.host })
+  const path = cacheIndexPath({ env, home, creds })
   const previous = readIndexFile(path)
   const startedAt = now()
   const baselineRefreshedAt = previous?.refreshedAt ?? null
