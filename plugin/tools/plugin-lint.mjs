@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * plugin-lint —— **插件自身**的结构一致性校验。只在 workflow-plugin 仓内跑(npm run lint:plugin / CI / /workflow:lint)。
- * 用法:node tools/plugin-lint.mjs [插件根目录]   (省略参数时取本脚本上级目录)
+ * 用法:node plugin/tools/plugin-lint.mjs [插件根目录]   (省略参数时取本脚本上级目录,即 plugin/)
  *
  * 边界:项目 .spec/ 由 bin/spec-lint.mjs 校验;Agent Plugins 1.0.0 的清单合规由 tests/agent-plugins-conformance.test.mjs 负责。
  * 两者分开,是为了让装了插件的下游项目不被插件自身的结构校验项误伤。
@@ -9,6 +9,8 @@
  *
  * 校验项清单(本注释是插件侧「lint 能力清单」的单一权威):
  *  1. 核心文件存在:plugin.json、.claude-plugin/plugin.json。
+ *  1b. 发布面隔离:插件根下不得出现 tests / .github / package.json / .gitignore / .claude ——
+ *     发布面是「装进用户机器的全部内容」,开发过程文件混进来会被原样下发。
  *  2. skills:skills/ 每个直接子目录都有 SKILL.md,frontmatter name 与目录名一致、description 非空;
  *     其余键限于 Agent Skills 标准的可选字段(license / allowed-tools / metadata / version)。
  *  3. agents:agents/*.md 的 frontmatter 只允许 name + description + disallowedTools,name 与文件名一致;
@@ -41,6 +43,16 @@ export function pluginLint(root) {
   // ── 1. 核心文件存在 ─────────────────────────────────────────────────
   for (const rel of ['plugin.json', '.claude-plugin/plugin.json']) {
     if (!existsSync(join(root, rel))) err(join(root, rel), `缺核心文件:${rel}`)
+  }
+
+  // ── 1b. 发布面隔离 ──────────────────────────────────────────────────
+  // 插件根 = 装进用户机器的全部内容。开发过程文件混进来会被原样下发:
+  // 本仓的 tests/ 与 package.json 对用户毫无意义,而 .claude/ 会把本仓自己的
+  // 项目配置带进别人的项目。靠自觉守不住,所以在这儿变成机器拦截。
+  for (const leaked of ['tests', '.github', 'package.json', '.gitignore', '.claude']) {
+    if (existsSync(join(root, leaked))) {
+      err(join(root, leaked), `发布面混入开发过程文件:${leaked}(会被原样装进用户机器)`)
+    }
   }
 
   // ── 2. skills ───────────────────────────────────────────────────────

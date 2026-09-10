@@ -14,7 +14,7 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/spec-lint.mjs" "${CLAUDE_PROJECT_DIR}" $ARGUMENT
 如果当前项目**就是 Workflow 插件仓本身**（仓根 `plugin.json` 的 `name` 为 `workflow`），再跑插件自身的校验与测试：
 
 ```bash
-node "${CLAUDE_PROJECT_DIR}/tools/plugin-lint.mjs" && npm test --prefix "${CLAUDE_PROJECT_DIR}"
+node "${CLAUDE_PROJECT_DIR}/plugin/tools/plugin-lint.mjs" && npm test --prefix "${CLAUDE_PROJECT_DIR}"
 ```
 
 把失败项逐条报给用户并指出修法；红不能被改成假绿——删检查项、放宽枚举只能经 ADR。全绿就报 OK，不要加修饰。

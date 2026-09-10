@@ -4,13 +4,12 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Agent Plugins 1.0.0：仓库根即插件根，skills/ 与 commands/ 都在根上。
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const pluginRoot = repoRoot;
+// Agent Plugins 1.0.0：插件根是仓库根下的 plugin/，skills/ 与 commands/ 都在它下面。
+const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "plugin");
 const planningRoot = join(pluginRoot, "skills/workflow-planning");
 
 function read(relativePath) {
-  const absolutePath = join(repoRoot, relativePath);
+  const absolutePath = join(pluginRoot, relativePath);
   assert.ok(existsSync(absolutePath), `缺少 ${relativePath}`);
   return readFileSync(absolutePath, "utf8");
 }
@@ -77,7 +76,7 @@ test("正确路由规划、单次操作与独立写入授权", () => {
   const ladderOwners = listFiles(join(pluginRoot, "skills"))
     .filter((file) => extname(file) === ".md")
     .filter((file) => /export WORKFLOW_API_BASE=/.test(readFileSync(file, "utf8")))
-    .map((file) => relative(repoRoot, file));
+    .map((file) => relative(pluginRoot, file));
   assert.deepEqual(ladderOwners, [
     "skills/workflow-ops/references/connection.md",
   ], `凭证解析片段应只存在于 connection.md，实际出现在：${ladderOwners.join(", ")}`);
@@ -86,10 +85,12 @@ test("正确路由规划、单次操作与独立写入授权", () => {
   const manifest = JSON.parse(read(".claude-plugin/plugin.json"));
   assert.match(manifest.description, /规划需求与需求室/);
 
-  const marketplace = JSON.parse(read(".claude-plugin/marketplace.json"));
+  const marketplace = JSON.parse(
+    readFileSync(join(pluginRoot, "..", ".claude-plugin/marketplace.json"), "utf8"),
+  );
   assert.match(marketplace.plugins[0].description, /规划需求与需求室/);
 
-  const readme = read("README.md");
+  const readme = readFileSync(join(pluginRoot, "..", "README.md"), "utf8");
   assert.match(readme, /workflow-planning/);
   assert.match(readme, /\/workflow:plan/);
   assert.match(readme, /蓝图内容确认与线上写入是两个闸门/);
@@ -263,7 +264,7 @@ test("规划 Skill 只含公开 Markdown、相对链接有效且不泄露内部�
   const files = listFiles(planningRoot);
   assert.ok(files.length >= 5, "需求规划技能缺少模板或参考文件");
   for (const absolutePath of files) {
-    const displayPath = relative(repoRoot, absolutePath);
+    const displayPath = relative(pluginRoot, absolutePath);
     assert.equal(extname(absolutePath), ".md", `${displayPath} 不是 Markdown`);
     const content = readFileSync(absolutePath, "utf8");
     // 与 tests/workflow-qa-contract.test.mjs 的脱敏禁令同一口径：`.spec/` 已移出禁令——它是本插件

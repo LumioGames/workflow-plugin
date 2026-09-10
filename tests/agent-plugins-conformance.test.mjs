@@ -1,4 +1,4 @@
-// Agent Plugins 1.0.0 合规：仓库根即插件根。
+// Agent Plugins 1.0.0 合规：插件根是仓库根下的 plugin/（发布面），仓库根是开发面。
 //
 // 存在的理由：规范的 plugin.json 是**封闭 schema**——多一个顶层字段就是违规，而客户端
 // 不会在加载时去拉 schema 校验，只会静默拒载或忽略。这层测试把「复制 package.json 时
@@ -13,6 +13,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+/** 发布面：装进用户机器的就是这一层。清单、skills/、LICENSE、VERSION 都在这儿。 */
+const pluginRoot = join(repoRoot, "plugin");
 
 const PLUGIN_SCHEMA_ID = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
 const MCP_SCHEMA_ID = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json";
@@ -34,8 +36,8 @@ const ALLOWED_TOP_LEVEL = new Set([
 /** §5.4：author 对象只允许这三个键。 */
 const ALLOWED_AUTHOR_KEYS = new Set(["name", "email", "url"]);
 
-function readJson(relativePath) {
-  const absolute = join(repoRoot, relativePath);
+function readJson(relativePath, root = pluginRoot) {
+  const absolute = join(root, relativePath);
   assert.ok(existsSync(absolute), `缺少 ${relativePath}`);
   return JSON.parse(readFileSync(absolute, "utf8"));
 }
@@ -88,13 +90,13 @@ describe("Agent Plugins 1.0.0 清单", () => {
     }
     assert.ok(Array.isArray(manifest.keywords ?? []), "keywords 必须是数组");
     if (manifest.license) {
-      assert.ok(existsSync(join(repoRoot, "LICENSE")), "声明了 license 却没有 LICENSE 文件");
+      assert.ok(existsSync(join(pluginRoot, "LICENSE")), "声明了 license 却没有 LICENSE 文件");
     }
   });
 
   test("mcp.json 若存在则必须与 plugin.json 同版本（§10.1）", () => {
     // 本插件当前不带 MCP server；哪天加了，版本对不上会让 MCP 整体被禁用而不是报错。
-    const mcpPath = join(repoRoot, "mcp.json");
+    const mcpPath = join(pluginRoot, "mcp.json");
     if (!existsSync(mcpPath)) return;
     const mcp = JSON.parse(readFileSync(mcpPath, "utf8"));
     assert.equal(mcp.$schema, MCP_SCHEMA_ID);
@@ -107,7 +109,7 @@ describe("Agent Plugins 1.0.0 清单", () => {
 });
 
 describe("组件发现（§6.1 固定位置）", () => {
-  const skillsRoot = join(repoRoot, "skills");
+  const skillsRoot = join(pluginRoot, "skills");
 
   test("skills/ 在插件根，且每个直接子目录都有 SKILL.md", () => {
     assert.ok(statSync(skillsRoot).isDirectory(), "skills 必须是目录");
@@ -144,18 +146,26 @@ describe("双格式共存", () => {
     assert.equal(claude.version, manifest.version, "两份清单的 version 必须一致");
   });
 
-  test("marketplace 指向仓库根，与扁平化后的插件根一致", () => {
-    const marketplace = readJson(".claude-plugin/marketplace.json");
+  test("marketplace 留在仓库根，用 git-subdir 指向 plugin/", () => {
+    const marketplace = readJson(".claude-plugin/marketplace.json", repoRoot);
     const entry = marketplace.plugins.find((plugin) => plugin.name === manifest.name);
     assert.ok(entry, `marketplace.json 里找不到名为 ${manifest.name} 的条目`);
-    assert.equal(entry.source, "./", "扁平化后插件根就是仓库根，source 应为 \"./\"");
+    assert.deepEqual(
+      entry.source,
+      {
+        source: "git-subdir",
+        url: "https://github.com/LumioGames/workflow-plugin.git",
+        path: "plugin",
+      },
+      "插件载荷在子目录，marketplace 必须用 git-subdir 指向 plugin/",
+    );
   });
 
   test("版本号四方一致：plugin.json / .claude-plugin / package.json / VERSION", () => {
     const version = manifest.version;
-    assert.equal(readJson("package.json").version, version, "package.json 版本不一致");
+    assert.equal(readJson("package.json", repoRoot).version, version, "package.json 版本不一致");
     assert.equal(
-      readFileSync(join(repoRoot, "skills/workflow-update/VERSION"), "utf8").trim(),
+      readFileSync(join(pluginRoot, "skills/workflow-update/VERSION"), "utf8").trim(),
       version,
       "workflow-update/VERSION 不一致",
     );

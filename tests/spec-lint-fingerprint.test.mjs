@@ -10,11 +10,11 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   normalizeLine, hashLine, generateFingerprint, loadFingerprint, scanText, DEFAULT_RESERVED_HEADINGS, FINGERPRINT_API,
-} from '../tools/fingerprint.mjs'
-import { runSpecLint, formatReport } from '../tools/spec-lint/core.mjs'
-import { specFixture, writeFiles, makeTemp, cleanup, REPO_ROOT } from './fixtures/w3/spec-fixture.mjs'
+} from '../plugin/tools/fingerprint.mjs'
+import { runSpecLint, formatReport } from '../plugin/tools/spec-lint/core.mjs'
+import { specFixture, writeFiles, makeTemp, cleanup, PLUGIN_ROOT } from './fixtures/w3/spec-fixture.mjs'
 
-const GEN = join(REPO_ROOT, 'tools', 'fingerprint.mjs')
+const GEN = join(PLUGIN_ROOT, 'tools', 'fingerprint.mjs')
 const RULE_LINES = [
   '- **调度取向:快 > 稳 > 好。** 默认并行:文件集互不重叠即并行扇出;能继承上下文的 fork 优先于冷启动 worker。',
   '- **派 worker 三选一:** ① 多个互不依赖任务可并行 ② 改动大到撑爆编排上下文 ③ 需要隔离的干净实现环境。',

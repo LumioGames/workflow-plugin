@@ -149,9 +149,28 @@ npx github:LumioGames/workflow-plugin spec-lint . --strict
 
 ---
 
+## 仓库布局
+
+本仓既是插件本身，也是一个用这套插件干活的项目。**用户装到的只有 `plugin/`。**
+
+```
+workflow-plugin/
+├── plugin/            # ★ 发布面：skills/ agents/ commands/ hooks/ rules/ templates/ tools/ bin/
+├── .claude-plugin/    # marketplace.json（留在仓库根，用 git-subdir 指向 plugin/）
+└── tests/             # 开发面，不下发；package.json / .github/ 同理
+```
+
+往 `plugin/` 里放开发过程文件（`tests/`、`package.json`、`.github/`、`.gitignore`、`.claude/`）
+会被 `plugin-lint` 的「发布面隔离」检查拦下 —— 否则这些会被原样装进用户机器。
+
+**本地开发**：`git-subdir` 从远端 URL 克隆，所以本地路径 marketplace 装不出子目录插件。
+改动想即时生效，把 `~/.claude/plugins/` 下对应目录软链到本仓的 `plugin/`（不提交这个链接）。
+
+---
+
 ## 30 秒装好
 
-本仓库同时是一个 **[Agent Plugins 1.0.0](https://agent-plugins.org/)** 插件包和一个 Claude Code marketplace —— 仓库根就是插件根，两边客户端都能直接装。
+本仓库同时是一个 **[Agent Plugins 1.0.0](https://agent-plugins.org/)** 插件包和一个 Claude Code marketplace —— 插件本体在 [`plugin/`](plugin/)，仓库根只放开发面（见 [仓库布局](#仓库布局)），两边客户端都能直接装。
 
 **Agent Plugins 客户端**（Cursor / Codex / Copilot / VS Code / Kiro …）
 

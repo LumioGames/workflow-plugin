@@ -12,8 +12,8 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
-const skillsRoot = join(repoRoot, "skills");
+const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "../..", "plugin");
+const skillsRoot = join(pluginRoot, "skills");
 
 const OPENAPI_URL = "https://workflow.games/openapi/gameflow.v1.yaml";
 const VERSION_URL = "https://workflow.games/plugin/version.json";
@@ -28,7 +28,7 @@ function listFiles(directory) {
 
 const skillFiles = listFiles(skillsRoot)
   .filter((file) => extname(file) === ".md")
-  .map((file) => ({ path: relative(repoRoot, file), text: readFileSync(file, "utf8") }));
+  .map((file) => ({ path: relative(pluginRoot, file), text: readFileSync(file, "utf8") }));
 
 const allSkillText = skillFiles.map((file) => file.text).join("\n");
 
@@ -357,7 +357,7 @@ describe("离线不变量", () => {
 
   test("技能包只含 Markdown 与 VERSION，且不含疑似凭据", () => {
     for (const file of listFiles(skillsRoot)) {
-      const display = relative(repoRoot, file);
+      const display = relative(pluginRoot, file);
       assert.ok(
         extname(file) === ".md" || file.endsWith("VERSION"),
         `${display} 不是 Markdown 或 VERSION——技能包不允许可执行文件`,
@@ -366,16 +366,19 @@ describe("离线不变量", () => {
     }
   });
 
-  test("插件清单齐备", () => {
-    for (const required of [
-      "plugin.json",
-      ".claude-plugin/marketplace.json",
-      ".claude-plugin/plugin.json",
-      "CHANGELOG.md",
-      "package.json",
-      "LICENSE",
-    ]) {
-      assert.ok(existsSync(join(repoRoot, required)), `缺少 ${required}`);
+  test("插件清单齐备,且发布面与开发面各就各位", () => {
+    // 发布面:装进用户机器的就是 plugin/ 的全部内容。
+    for (const required of ["plugin.json", ".claude-plugin/plugin.json", "LICENSE"]) {
+      assert.ok(existsSync(join(pluginRoot, required)), `plugin/ 缺少 ${required}`);
+    }
+    // 开发面:留在仓库根,不下发。marketplace 也在根上——它用 git-subdir 指向 plugin/。
+    const repoRoot = join(pluginRoot, "..");
+    for (const required of [".claude-plugin/marketplace.json", "CHANGELOG.md", "package.json"]) {
+      assert.ok(existsSync(join(repoRoot, required)), `仓库根缺少 ${required}`);
+    }
+    // 反向:开发过程文件不得混进发布面。
+    for (const leaked of ["tests", "package.json", ".github"]) {
+      assert.equal(existsSync(join(pluginRoot, leaked)), false, `发布面混入 ${leaked}`);
     }
   });
 });

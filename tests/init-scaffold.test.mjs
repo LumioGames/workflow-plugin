@@ -8,11 +8,11 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { initScaffold, IMPORT_LINES, WORKFLOW_NOTE } from '../tools/init-scaffold.mjs'
-import { runSpecLint, formatReport } from '../tools/spec-lint/core.mjs'
-import { makeTemp, cleanup, REPO_ROOT } from './fixtures/w3/spec-fixture.mjs'
+import { initScaffold, IMPORT_LINES, WORKFLOW_NOTE } from '../plugin/tools/init-scaffold.mjs'
+import { runSpecLint, formatReport } from '../plugin/tools/spec-lint/core.mjs'
+import { makeTemp, cleanup, PLUGIN_ROOT } from './fixtures/w3/spec-fixture.mjs'
 
-const SCRIPT = join(REPO_ROOT, 'tools', 'init-scaffold.mjs')
+const SCRIPT = join(PLUGIN_ROOT, 'tools', 'init-scaffold.mjs')
 const EXPECTED = [
   '.spec/AGENTS.md',
   '.spec/decisions/README.md',
@@ -26,7 +26,7 @@ const EXPECTED = [
 describe('生成集合', () => {
   test('空目录:恰好生成项目专属七件;不生成 tasks / plans / .workflow', () => {
     const target = makeTemp('init-')
-    const r = initScaffold({ pluginRoot: REPO_ROOT, target })
+    const r = initScaffold({ pluginRoot: PLUGIN_ROOT, target })
     assert.deepEqual(r.created, EXPECTED)
     assert.deepEqual(r.skipped, [])
     assert.deepEqual(r.imports, [])
@@ -39,8 +39,8 @@ describe('生成集合', () => {
   })
 
   test('templates/ 下只有 .spec/,且没有 tasks / plans 子目录(模板本身也守分工)', () => {
-    assert.deepEqual(readdirSync(join(REPO_ROOT, 'templates')), ['.spec'])
-    const spec = readdirSync(join(REPO_ROOT, 'templates', '.spec')).sort()
+    assert.deepEqual(readdirSync(join(PLUGIN_ROOT, 'templates')), ['.spec'])
+    const spec = readdirSync(join(PLUGIN_ROOT, 'templates', '.spec')).sort()
     assert.deepEqual(spec, ['AGENTS.md', 'decisions', 'knowledge', 'rules', 'tools'])
   })
 
@@ -48,7 +48,7 @@ describe('生成集合', () => {
     const banned = ['契约卡', 'wave', '.spec/tasks', '收口门槛', '铁律', 'in_progress']
     const reserved = ['## 调度核心', '## 编码约定', '## 宿主差异', '## 协作 / 调度', '## 安全 / 外发', '## 工程']
     const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]))
-    for (const file of walk(join(REPO_ROOT, 'templates'))) {
+    for (const file of walk(join(PLUGIN_ROOT, 'templates'))) {
       const text = readFileSync(file, 'utf8')
       for (const w of banned) assert.equal(text.toLowerCase().includes(w.toLowerCase()), false, `${file} 含「${w}」`)
       for (const h of reserved) assert.equal(text.includes(`${h}\n`), false, `${file} 含保留标题「${h}」`)
@@ -59,14 +59,14 @@ describe('生成集合', () => {
 describe('幂等与覆盖', () => {
   test('第二次跑:一个都不新建、全部跳过、内容不变;--force 才覆盖', () => {
     const target = makeTemp('init-')
-    initScaffold({ pluginRoot: REPO_ROOT, target })
+    initScaffold({ pluginRoot: PLUGIN_ROOT, target })
     writeFileSync(join(target, '.spec/AGENTS.md'), '# 用户改过\n')
-    const again = initScaffold({ pluginRoot: REPO_ROOT, target })
+    const again = initScaffold({ pluginRoot: PLUGIN_ROOT, target })
     assert.deepEqual(again.created, [])
     assert.deepEqual(again.overwritten, [])
     assert.deepEqual(again.skipped, EXPECTED)
     assert.equal(readFileSync(join(target, '.spec/AGENTS.md'), 'utf8'), '# 用户改过\n')
-    const forced = initScaffold({ pluginRoot: REPO_ROOT, target, force: true })
+    const forced = initScaffold({ pluginRoot: PLUGIN_ROOT, target, force: true })
     assert.deepEqual(forced.overwritten, EXPECTED)
     assert.match(readFileSync(join(target, '.spec/AGENTS.md'), 'utf8'), /^# 项目中心文档/)
     cleanup(target)
@@ -75,13 +75,13 @@ describe('幂等与覆盖', () => {
   test('已有 CLAUDE.md 只补缺失的 @import 行,补一次后不再追加,用户内容原样保留', () => {
     const target = makeTemp('init-')
     writeFileSync(join(target, 'CLAUDE.md'), '# 我的入口\n\n@.spec/AGENTS.md\n\n自己的话。\n')
-    const r = initScaffold({ pluginRoot: REPO_ROOT, target })
+    const r = initScaffold({ pluginRoot: PLUGIN_ROOT, target })
     assert.ok(r.skipped.includes('CLAUDE.md'))
     assert.deepEqual(r.imports, ['@.spec/knowledge/README.md', '@.spec/rules/system.md'])
     const text = readFileSync(join(target, 'CLAUDE.md'), 'utf8')
     assert.match(text, /^# 我的入口\n\n@\.spec\/AGENTS\.md\n\n自己的话。\n/)
     assert.equal((text.match(/@\.spec\/AGENTS\.md/g) ?? []).length, 1)
-    const again = initScaffold({ pluginRoot: REPO_ROOT, target })
+    const again = initScaffold({ pluginRoot: PLUGIN_ROOT, target })
     assert.deepEqual(again.imports, [])
     assert.equal(readFileSync(join(target, 'CLAUDE.md'), 'utf8'), text)
     cleanup(target)
@@ -91,7 +91,7 @@ describe('幂等与覆盖', () => {
 describe('生成物过 lint', () => {
   test('骨架 + 样例扩展一起过 spec-lint(零错误,扩展加载出两项)', async () => {
     const target = makeTemp('init-')
-    initScaffold({ pluginRoot: REPO_ROOT, target })
+    initScaffold({ pluginRoot: PLUGIN_ROOT, target })
     const result = await runSpecLint({ root: target, fingerprint: null, strict: true })
     cleanup(target)
     assert.equal(result.ok, true, formatReport(result))

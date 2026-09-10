@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "workflow-plugin",
   "description": "Workflow（workflow.games）官方 Agent 插件：让 AI Agent 自己规划需求、落单、跑测验收并回写线上项目管理系统",
   "owner": {
@@ -8,8 +9,17 @@
   "plugins": [
     {
       "name": "workflow",
-      "source": "./",
-      "description": "让 AI Agent 直连 Workflow（workflow.games）：本地优先规划与拆解需求、自动查重和补全依赖、按权限模式受控并发上传、规划需求与需求室、记 bug、查任务、拿单执行与证据回写、跨仓库交接纪要、线上 QA 验收、查文档、经确认后向平台方匿名反馈问题与建议"
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/LumioGames/workflow-plugin.git",
+        "path": "plugin"
+      },
+      "description": "让 AI Agent 直连 Workflow（workflow.games）：本地优先规划与拆解需求、自动查重和补全依赖、按权限模式受控并发上传、规划需求与需求室、记 bug、查任务、拿单执行与证据回写、跨仓库交接纪要、线上 QA 验收、查文档、经确认后向平台方匿名反馈问题与建议",
+      "homepage": "https://workflow.games",
+      "repository": "https://github.com/LumioGames/workflow-plugin",
+      "license": "MIT",
+      "category": "workflow",
+      "keywords": ["workflow", "project-management", "requirements", "bug-tracking", "qa"]
     }
   ]
 }

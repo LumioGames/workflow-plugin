@@ -10,10 +10,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "plugin");
 
 function read(relativePath) {
-  const absolute = join(repoRoot, relativePath);
+  const absolute = join(pluginRoot, relativePath);
   assert.ok(existsSync(absolute), `缺少 ${relativePath}`);
   return readFileSync(absolute, "utf8");
 }

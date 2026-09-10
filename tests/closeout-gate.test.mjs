@@ -8,9 +8,9 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { appendFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { makeTemp, writeFiles, gitInit, git, cleanup, REPO_ROOT } from './fixtures/w3/spec-fixture.mjs'
+import { makeTemp, writeFiles, gitInit, git, cleanup, PLUGIN_ROOT } from './fixtures/w3/spec-fixture.mjs'
 
-const GATE = join(REPO_ROOT, 'tools', 'closeout-gate.mjs')
+const GATE = join(PLUGIN_ROOT, 'tools', 'closeout-gate.mjs')
 
 function repo() {
   const root = makeTemp('gate-')

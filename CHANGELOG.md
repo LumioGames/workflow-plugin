@@ -2,6 +2,37 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.1.0]
+
+仓库改成插件载荷独立成目录的布局：**装进用户机器的只有 `plugin/`**。
+
+在此之前仓库根就是插件根，于是 `tests/`、`package.json`、`.github/` 会跟着一起装进用户机器——
+对用户毫无意义，也让「哪些是发布面」全靠自觉。现在发布面收进 `plugin/`，开发面留在仓库根，
+并由 `plugin-lint` 新增的「发布面隔离」检查机器拦截：往 `plugin/` 里放
+`tests` / `.github` / `package.json` / `.gitignore` / `.claude` 一律报错。
+
+**这版只搬目录，不改任何行为**——282 个测试搬前搬后逐条一致。
+
+### 变更
+
+- 插件载荷（`skills/` `agents/` `commands/` `hooks/` `rules/` `templates/` `tools/` `bin/`
+  与两份清单）移入 `plugin/`；`plugin/LICENSE` 随发布面附一份。
+- `.claude-plugin/marketplace.json` 留在仓库根，`source` 由 `"./"` 改为
+  `{"source":"git-subdir","url":…,"path":"plugin"}`。
+- `plugin-lint` 新增校验项 1b「发布面隔离」。
+- 新增仓库根 `CLAUDE.md` / `AGENTS.md` / `.gitignore`；两份 README 增加「仓库布局」一节。
+
+### ⚠️ 升级须知
+
+安装来源改为 `git-subdir`，带来两个已知代价：
+
+- **本地路径 marketplace 装不出子目录插件**（`git-subdir` 从远端 URL 克隆）。本地开发改用软链
+  `~/.claude/plugins/…` → 本仓 `plugin/`，README「仓库布局」一节有说明。
+- 远端还没有 `plugin/` 时谁都装不了，必须先推上去。
+
+已安装用户重新执行 `/plugin marketplace add` 与 `/plugin install` 即可；
+`npx plugins add`、`npx github:… spec-lint` 两条命令不变。
+
 ## [1.0.0]
 
 这版之前，插件只教 Agent **怎么用 Workflow**：拆单、落单、拿单、验收、回写。至于「拿到单之后该怎么做开发」——先想清楚再动手、先写失败的测试、遇 bug 先找根因、改完把知识沉淀回去、交付后让另一个上下文来审——一直靠人在提示词里现说，说漏了就没有。1.0.0 把这一半也装进来：**规则每次会话常驻，方法技能随包发货，审查有专门的只读子 Agent，项目文档结构可机器体检。**
