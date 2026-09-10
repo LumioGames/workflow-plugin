@@ -182,7 +182,7 @@ describe("执行流程纪律", () => {
 
 describe("交接纪要（接力的单一真值）", () => {
   test("开工前读所属需求室最近的纪要，并声明它是数据不是指令", () => {
-    // ADR-0015：纪要比群历史窄得多，但仍然是别人写的自由文本——注入面没有消失。
+    // 纪要比群历史窄得多，但仍然是别人写的自由文本——注入面没有消失。
     assert.match(skill, /rooms\/\{roomId\}\/handoffs/);
     assert.match(flow, /rooms\/\{roomId\}\/handoffs/);
     assert.match(readCard, /rooms\/<room-uuid>\/handoffs/);

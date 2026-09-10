@@ -26,7 +26,7 @@ Subagent (general-purpose):
     【开始之前】对需求、验收项、方案、依赖有任何疑问——现在问，不猜。
 
     【怎么做】
-    1. 先加载再动手：读项目文档根 `.spec` 下 `knowledge/README.md` 导航里与本单相关的文档、
+    1. 先加载再动手：读 `.spec/knowledge/README.md` 导航里与本单相关的文档、
        被改源文件；改动规模决定读多深。
     2. 按单正文实现；要写生产代码时用 test-driven-development（先失败测试）；遇到 bug 先
        systematic-debugging 找根因再改。

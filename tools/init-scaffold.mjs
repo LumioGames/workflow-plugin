@@ -2,7 +2,7 @@
 /**
  * /workflow:init 的执行体 —— 把插件 templates/ 释放到目标项目,并补根 CLAUDE.md 的项目专属 @import。
  *
- * 生成的只有「这个项目是什么、定过什么」那一半(ADR-088 分工):.spec/AGENTS.md、rules/system.md(空模板)、
+ * 生成的只有「这个项目是什么、定过什么」那一半(插件出方法、项目出事实的分工):.spec/AGENTS.md、rules/system.md(空模板)、
  * knowledge/README.md + features/_TEMPLATE.md、decisions/README.md、tools/lint-extensions.mjs(样例)、根 CLAUDE.md。
  * 不生成 tasks/、plans/(任务真值只有 Workflow),不写 .workflow、不生成 token(项目绑定走 /workflow:setup)。
  *

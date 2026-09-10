@@ -12,12 +12,12 @@
  *  2. skills:skills/ 每个直接子目录都有 SKILL.md,frontmatter name 与目录名一致、description 非空;
  *     其余键限于 Agent Skills 标准的可选字段(license / allowed-tools / metadata / version)。
  *  3. agents:agents/*.md 的 frontmatter 只允许 name + description + disallowedTools,name 与文件名一致;
- *     reviewer.md 若存在,disallowedTools 必须含 Bash(ADR-088 决策 7:只读、只出报告)。
+ *     reviewer.md 若存在,disallowedTools 必须含 Bash(reviewer 只读、只出报告,不跑命令)。
  *  4. commands:commands/*.md 必须有 frontmatter 且 description 非空(宿主据此列出 / 命令)。
  *  5. hooks:hooks/hooks.json 可解析;不得注册 PreToolUse(commit 阻断钩子已移除);
  *     SessionStart 命令里 ${CLAUDE_PLUGIN_ROOT}/<script> 指向的脚本必须存在(写错不报错,只会让规则静默缺席)。
  *  6. rules:rules/*.md 不得出现旧制度词汇(契约卡 / wave / .spec/tasks / 收口门槛 / 铁律 / in_progress)——
- *     ADR-088 语汇替换表要求它们在插件规则里一个不留。
+ *     这些是被替换掉的旧制度语汇,插件规则里一个不留。
  *  7. 链接可达:rules / agents / commands / templates / skills 下 .md 的相对链接必须指向存在的文件。
  *  8. 模板隔离:templates/ 内 .md 的相对链接不得解析到 templates/ 之外(如 ../../skills/x)——
  *     模板会被原样复制进用户项目,插件资产在那边不存在;模板树内部的相对链接(tools/、rules/)不受限。
@@ -98,7 +98,7 @@ export function pluginLint(root) {
       err(hooksFile, 'hooks.json 不是合法 JSON')
     }
     if (hooks && typeof hooks === 'object') {
-      if ('PreToolUse' in hooks) err(hooksFile, '注册了 PreToolUse——commit 阻断钩子已移除(ADR-088 决策 8),插件只留 SessionStart')
+      if ('PreToolUse' in hooks) err(hooksFile, '注册了 PreToolUse——commit 阻断钩子已移除,插件只留 SessionStart')
       const sessionStart = Array.isArray(hooks.SessionStart) ? hooks.SessionStart : []
       const commands = sessionStart.flatMap((entry) => (entry.hooks ?? []).map((h) => h.command ?? ''))
       for (const command of commands) {

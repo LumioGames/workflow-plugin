@@ -14,7 +14,7 @@ description: 主 loop 要把多张 Workflow（workflow.games）单同时派给�
 - **任务真值只有 Workflow 单。** 状态一律现查 transitions、取语义为「进行中 / 待验收」的边（G6），不写状态名；进度不记在本地文件里。
 - **worker 不接触 Workflow 凭证、不写单**（G4）。worker 按 `workflow-execute` 模式二交结构化报告，回写全部由主 loop 代做。
 - **不复跑 worker 的测试；worker 的成功报告不作数，以 diff 为准。** 交回物里贴的命令与输出是它的证据；主 loop 核对 diff 与声称是否对得上，不重跑（G7 的对偶：没跑的它写「未执行」，主 loop 也不替它跑）。
-- **合入只守一条线：能编过**（ADR-087 决策 3）——本地编译输出或 CI 的 build 作业任一即可；测试结果不作为合入条件。交回物里写「等 CI 转绿」= 违规，退回。
+- **合入只守一条线：能编过**——本地编译输出或 CI 的 build 作业任一即可；**测试红是待办不是门**，测试结果不作为合入条件。交回物里写「等 CI 转绿」= 违规，退回。
 - **合入后审一次**，不每单审。reviewer（[agents/reviewer.md](../../agents/reviewer.md)）只读 diff、不跑命令、不挡合入、只出报告；结论由主 loop 写成 bug 单与评论。
 - **删 worktree 或分支之前，列出将丢失的内容并取得用户确认。**
 

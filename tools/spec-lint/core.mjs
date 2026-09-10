@@ -76,7 +76,7 @@ const fingerprintCheck = {
         report(`${relative(root, file)}:${start}-${end}`, `连续 ${count} 行与插件规则逐字相同(始于插件 ${source})——项目不抄插件任何一段`)
       }
     }
-    return { scanned: files.length, generatedAt: fp.generatedAt }
+    return { scanned: files.length }
   },
 }
 
@@ -186,7 +186,6 @@ export async function runSpecLint({ root = process.cwd(), extensions, strict = f
       if (r && typeof r === 'object') {
         if (r.skipped) { entry.status = 'skipped'; entry.note = String(r.skipped) }
         if (r.scanned !== undefined) entry.scanned = r.scanned
-        if (r.generatedAt) entry.generatedAt = r.generatedAt
       }
     } catch (e) {
       report(source === 'extension' ? extension.path : spec, `检查项 ${check.id} 执行异常:${e?.message ?? e}`)
@@ -240,7 +239,7 @@ export function formatReport(result) {
   lines.push(`  扩展 ${result.extension.path}:${EXT_STATUS_TEXT[result.extension.status] ?? result.extension.status}${extChecks.length ? `,${summarize(extChecks)}(${extChecks.map((c) => c.id).join(', ')})` : ''}`)
   const fp = result.checks.find((c) => c.source === 'fingerprint')
   if (fp?.status === 'skipped') lines.push(`  指纹 跳过:${fp.note}`)
-  else if (fp) lines.push(`  指纹 ${result.fingerprint.path}:扫描 ${fp.scanned ?? 0} 个文件${fp.generatedAt ? `(指纹生成于 ${fp.generatedAt})` : ''},${fp.findings} 处命中`)
+  else if (fp) lines.push(`  指纹 ${result.fingerprint.path}:扫描 ${fp.scanned ?? 0} 个文件,${fp.findings} 处命中`)
   for (const c of result.checks) {
     if (c.status === 'skipped' && c.source !== 'fingerprint') lines.push(`  · ${c.id} 跳过:${c.note}`)
   }

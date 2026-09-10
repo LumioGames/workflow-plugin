@@ -76,8 +76,9 @@ describe("方法技能口径", () => {
   test("brainstorming：设计门 + 落点为项目活文档与 ADR + 任务真值是 Workflow 单 + 交棒 workflow-planning", () => {
     const skill = read("skills/brainstorming/SKILL.md");
     assert.match(skill, /<HARD-GATE>/);
-    assert.match(skill, /knowledge\/features\/<topic>\.md/);
-    assert.match(skill, /`decisions\/`/);
+    // 落点写全路径：`.spec/` 是本插件公开发布的脚手架约定，不再避讳着写半截路径。
+    assert.match(skill, /`\.spec\/knowledge\/features\/<topic>\.md`/);
+    assert.match(skill, /`\.spec\/decisions\/`/);
     assert.match(skill, /任务真值只有 Workflow 单/);
     assert.match(skill, /交棒给 `workflow-planning`/);
   });
@@ -87,7 +88,7 @@ describe("方法技能口径", () => {
     assert.match(skill, /先有失败的测试，再有生产代码/);
     assert.match(skill, /不是推分支前的门/);
     assert.match(skill, /推分支前不要求跑任何命令/);
-    assert.match(skill, /ADR-087/);
+    assert.match(skill, /红是待办，不是门/);
     for (const step of ["### 红：", "### 验证红：", "### 绿：", "### 验证绿：", "### 重构："]) {
       assert.ok(skill.includes(step), `缺少 ${step}`);
     }

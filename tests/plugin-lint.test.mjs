@@ -1,7 +1,7 @@
 // plugin-lint:插件自身结构校验——对本仓必须全绿;对造出来的坏插件逐项抓错;部件不存在时跳过不报。
 //
 // 存在的理由:插件分几路并行吸收(rules / hooks、skills / agents、tools),任何一路先合入都得能跑 lint;
-// 而 reviewer 无 Bash、hooks 无 PreToolUse、rules 无旧制度词汇是 ADR-088 写死的失败语义,必须机器判。
+// 而 reviewer 无 Bash、hooks 无 PreToolUse、rules 无旧制度词汇是写死的失败语义,必须机器判。
 
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
@@ -89,7 +89,7 @@ describe('逐项', () => {
       'tools/ok.mjs': '',
     })
     assert.deepEqual(errors, [
-      'hooks/hooks.json: 注册了 PreToolUse——commit 阻断钩子已移除(ADR-088 决策 8),插件只留 SessionStart',
+      'hooks/hooks.json: 注册了 PreToolUse——commit 阻断钩子已移除,插件只留 SessionStart',
       'hooks/hooks.json: SessionStart 指向的脚本不存在:tools/inject-rules.mjs',
     ])
   })

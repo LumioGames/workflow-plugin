@@ -6,7 +6,9 @@
  * 用法:node tools/fingerprint.mjs generate --rules <dir> --out <file> [--reserved "标题1,标题2"]
  *   npm run fingerprint 即 generate --rules rules --out rules/.fingerprint.json。
  *
- * 文件格式:{ api: 1, generatedAt, reservedHeadings: [...], lines: { <sha1(归一化行)>: "<file>:<n>" } }
+ * 文件格式:{ api: 1, reservedHeadings: [...], lines: { <sha1(归一化行)>: "<file>:<n>" } }
+ * **只由 rules/ 的内容决定**:不记生成时间,规则没变重跑就是同一份字节(生成物只随生成源变,
+ * 否则每次发版都多出一条纯时间戳 diff,看不出规则到底改没改)。
  * 归一化(本文件的 normalizeLine 是生成与检查两侧共用的单一实现):去 markdown 标记(标题井号、列表符、
  * 引用符、复选框、强调、反引号、表格竖线、链接只留文字),再去掉全部空白(中文文本空白无语义,去掉强调标记
  * 后残留的空格不该影响比对);
@@ -57,7 +59,7 @@ function walkMd(dir) {
 }
 
 /** 生成指纹对象(不写盘)。文件名记为 <rules 目录名>/<相对路径>,与插件根相对路径一致。 */
-export function generateFingerprint({ rulesDir, reservedHeadings = DEFAULT_RESERVED_HEADINGS, now = new Date() }) {
+export function generateFingerprint({ rulesDir, reservedHeadings = DEFAULT_RESERVED_HEADINGS }) {
   rulesDir = resolve(rulesDir)
   if (!existsSync(rulesDir) || !statSync(rulesDir).isDirectory()) throw new Error(`规则目录不存在:${rulesDir}`)
   const lines = {}
@@ -70,7 +72,7 @@ export function generateFingerprint({ rulesDir, reservedHeadings = DEFAULT_RESER
       if (!(key in lines)) lines[key] = `${label}:${i + 1}`
     })
   }
-  return { api: FINGERPRINT_API, generatedAt: now.toISOString(), reservedHeadings: [...reservedHeadings], lines }
+  return { api: FINGERPRINT_API, reservedHeadings: [...reservedHeadings], lines }
 }
 
 /** 读指纹文件;不存在返回 null;格式不对抛错(调用方决定报什么)。 */

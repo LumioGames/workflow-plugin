@@ -6,7 +6,7 @@
 
 **Connect Claude Code, Cursor, and Codex to [Workflow](https://workflow.games) — requirements, bugs, tasks, status transitions, and live QA, all driven by your coding agent.**
 
-![version](https://img.shields.io/badge/version-0.9.1-2ea44f) ![skills](https://img.shields.io/badge/skills-10-blue) ![spec](https://img.shields.io/badge/Agent%20Plugins-1.0.0-8b5cf6) ![API](https://img.shields.io/badge/API-OpenAPI%20contract%20as%20truth-orange) ![write](https://img.shields.io/badge/writes-read--back%20verified-red)
+![version](https://img.shields.io/badge/version-1.0.0-2ea44f) ![skills](https://img.shields.io/badge/skills-16-blue) ![spec](https://img.shields.io/badge/Agent%20Plugins-1.0.0-8b5cf6) ![API](https://img.shields.io/badge/API-OpenAPI%20contract%20as%20truth-orange) ![write](https://img.shields.io/badge/writes-read--back%20verified-red)
 
 [简体中文](./README.md) · **English**
 
@@ -38,7 +38,9 @@
 
 **The Workflow Agent Plugin connects AI coding agents — Claude Code, Cursor, and Codex — directly to [Workflow](https://workflow.games) (workflow.games), a project management platform for game development teams.** Once installed, the agent turns a one-line request into an executable delivery blueprint and files it, reports bugs with automatic deduplication, runs QA against your real production environment, and moves ticket status based on the verdict — and **every write must be verified by reading it back** before the agent is allowed to claim success.
 
-The plugin ships 10 skills, 10 slash commands, and 21 hard gates (G1–G7 for writes, Q1–Q7 for QA, F1–F7 for feedback). Planning and write-backs first land in `.workflow-drafts/<bundleId>/`; dependency analysis and bounded concurrent upload are handled by dedicated skills with per-operation read-back. Automated tests treat the live OpenAPI contract as the source of truth and re-check for contract drift weekly. It follows the [Agent Plugins 1.0.0](https://agent-plugins.org/) specification, is also installable as a Claude Code marketplace plugin, and is MIT licensed.
+The plugin ships 16 skills, 13 slash commands, and 21 hard gates (G1–G7 for writes, Q1–Q7 for QA, F1–F7 for feedback). Planning and write-backs first land in `.workflow-drafts/<bundleId>/`; dependency analysis and bounded concurrent upload are handled by dedicated skills with per-operation read-back. Automated tests treat the live OpenAPI contract as the source of truth and re-check for contract drift weekly. It follows the [Agent Plugins 1.0.0](https://agent-plugins.org/) specification, is also installable as a Claude Code marketplace plugin, and is MIT licensed.
+
+**As of 1.0.0 it also covers how the work itself gets done**: every session starts by injecting the shared rules and pulling your live tickets into a local index, and the package now carries five method skills (brainstorming, TDD, debugging, knowledge upkeep, receiving review) plus a read-only reviewer subagent, a project structure lint (`/workflow:lint`), and a scaffolder (`/workflow:init`).
 
 ---
 
@@ -68,6 +70,12 @@ This plugin exists for all three. **It is not an "let the AI call the API" switc
 | `workflow-update` | Version self-check, sha256 verification, safe self-update |
 | `workflow-dependencies` | Analyze upstream/downstream dependencies, complete direct edges, and report transitive/blocking chains with evidence |
 | `workflow-upload` | Upload local bundles with permission policies, bounded concurrency, idempotent recovery, and read-back verification |
+| `workflow-dispatch` | **Fans out many tickets at once, then merges them** — picks ready tickets with non-overlapping file sets from a room, dispatches each into its own git worktree, takes the diff as the source of truth, and triggers exactly one reviewer pass after the merge; findings become bugs and comments written by the main loop |
+| `brainstorming` | Turns an idea into an agreed design before anyone writes code: clarifies intent, compares options, records the design as a living project doc plus a decision record, then hands off to `workflow-planning` |
+| `test-driven-development` | Write the failing test first: red, minimal implementation, refactor — with an anti-pattern checklist |
+| `systematic-debugging` | Four phases — root-cause investigation, pattern analysis, hypothesis testing, then the fix. **No fix before the root cause is found**; three failed attempts means question the architecture |
+| `spec-steward` | After a change lands, files "what changed and why" back into the project's `.spec/`: right location, valid frontmatter, navigation and ADR index in sync, in-flight work referenced by ticket key |
+| `receiving-code-review` | Verify before you change: one item at a time, each verified on its own, no performative agreement — and pushing back with evidence is allowed |
 
 ---
 
@@ -78,6 +86,50 @@ to bind, `DELETE` to unbind, and `GET /api/v1/requirement-graph` to verify. The 
 idempotent; graph `source` / `target` are only a stable display order and do not mean upstream/downstream.
 `workflow-dependencies` remains authoritative for `upstream -> downstream` direct edges, transitive and blocking
 chains, and evidence. The uploader binds only direct edges and verifies the graph by unordered UUID pair.
+
+---
+
+### Session hooks and the local ticket index
+
+Once installed, **every session start** (launch, resume, `/clear`, post-compaction) runs two things without you typing anything:
+
+**1. Inject the shared rules.** Everything under `rules/` enters the context — how to dispatch, how to close out, what is never allowed. The rules are a plugin asset and travel with the plugin version, so **projects must not keep their own copy** (`/workflow:lint` reports it as "project copied the plugin" if they do).
+
+**2. Pull your live tickets into a local index.** It lands in `$XDG_CACHE_HOME/workflow/index/<host>.json` (`~/.cache` when XDG is unset) — never in your repo, never in the plugin root. The rules are deliberate:
+
+- **No refetch within 15 minutes**, and a failure occupies that window too — otherwise every offline session start would burn a full timeout;
+- **One full re-alignment per day** (enumerating requirements room by room); everything else is incremental;
+- **Offline means reuse the previous snapshot**, stamped with the reason and time, exit code always 0 — the index is a convenience, not a gate;
+- **Only one line of counts enters the context** (path, item count, per-room counts, how long ago it refreshed). The body never does: when the agent needs a ticket key it greps that file itself, so a board with thousands of tickets costs you nothing in context budget;
+- **The index is for finding ticket keys and rooms; status comes from the server** — always fetch transitions live, never act on the `status` cached in the index.
+
+To refresh immediately (say, right after filing a batch), run `/workflow:index` — it ignores the 15-minute window. With no `.workflow` marker in the current directory it fetches nothing and says nothing; run `/workflow:setup` to bind the project first.
+
+### Structure lint and scaffolding
+
+**`/workflow:lint` — a structure check on the project's `.spec/` that reports without blocking.** Exit code is always 0 by default: findings are a to-do list, not a gate, and committing with findings open is fine. Only `--strict` exits 1 on errors (for CI), and `--json` prints a machine-readable result. The order is fixed and the report is one report:
+
+1. **Universal checks** — core files, frontmatter, navigation and ADR index coverage, link reachability, `@import` completeness, symlink health, duplicate ADR numbers and status lines, no parallel doc roots;
+2. **Project extension** — the optional `.spec/tools/lint-extensions.mjs`, loaded when it exports `api = 1` (a version mismatch is an **error**, never a silent skip). This is where a project adds its own checks;
+3. **Fingerprint** — if the project's `AGENTS.md` or `rules/` contains one of the plugin's reserved headings, or three consecutive lines identical to the plugin's rules, it reports "project copied the plugin." The shared rules are injected every session; a second copy only drifts.
+
+**`/workflow:init` — generates the project-specific half.** Only "what this project is and what it has decided": `.spec/AGENTS.md`, `.spec/rules/system.md` (an empty template for project-only red lines), `.spec/knowledge/README.md` and the feature-doc template, `.spec/decisions/README.md`, a sample `.spec/tools/lint-extensions.mjs`, and the root `CLAUDE.md`. It never overwrites existing files by default, so re-running it after a plugin upgrade just fills in new templates. It does **not** write `.workflow` and does **not** mint a token — binding a project is `/workflow:setup` — and it creates no local task directory, because Workflow is the only source of truth for tasks.
+
+The same check runs in CI without installing the plugin:
+
+```bash
+npx github:LumioGames/workflow-plugin spec-lint . --strict
+```
+
+### The reviewer subagent
+
+`agents/reviewer.md` is a **read-only adversarial reviewer**: assume the delivery is broken, then try to prove it. Three constraints are baked in:
+
+- **Reviews after the merge; never blocks it.** Merging only guards "it compiles." The findings are a to-do list for the main loop — file, fix, re-review — not a rollback gate.
+- **No Bash.** It runs no tests, no lint, no build, and touches no git. The main loop hands it the diff as a file; it reads changed files on demand.
+- **Report only.** No transitions, no ticket creation, no comments, no code changes — the main loop turns findings into bugs and comments so there is exactly one writer.
+
+Why a separate context at all: **the author and the reviewer must be two contexts.** Reviewing your own output does not work.
 
 ---
 
@@ -108,7 +160,9 @@ curl -fsSL https://workflow.games/plugin/install.sh | bash
 
 No account yet? Just tell the agent **"connect me to Workflow"** — `workflow-setup` walks you through registration, token creation, config, and verification.
 
-You get ten commands: `/workflow:setup`, `/workflow:plan <description>`, `/workflow:bug <description>`, `/workflow:take <ticket>`, `/workflow:qa <ticket>`, `/workflow:deps <ticket-or-bundle>`, `/workflow:upload <bundle>`, `/workflow:policy <show|set>`, `/workflow:feedback <description>`, `/workflow:update`.
+You get thirteen commands: `/workflow:setup`, `/workflow:plan <description>`, `/workflow:bug <description>`, `/workflow:take <ticket>`, `/workflow:qa <ticket>`, `/workflow:deps <ticket-or-bundle>`, `/workflow:upload <bundle>`, `/workflow:policy <show|set>`, `/workflow:feedback <description>`, `/workflow:update`, plus `/workflow:init`, `/workflow:lint`, and `/workflow:index`, new in 1.0.0.
+
+> **If you installed the `lumioagentspec` plugin**: all of its functionality is now part of this plugin as of 1.0.0, and running both injects the rules twice — so while it is still enabled, every session start prompts you to uninstall it.
 
 ---
 

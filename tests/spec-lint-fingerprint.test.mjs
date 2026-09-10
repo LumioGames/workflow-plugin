@@ -1,6 +1,6 @@
 // 规则指纹:生成器输出格式、归一化口径、保留标题与连续命中的判定,以及 core 里指纹项的接线。
 //
-// 存在的理由:ADR-088 决策 2「项目不抄插件任何一段」靠这一项变成机器可判——保留标题一出现就报,
+// 存在的理由:「项目不抄插件任何一段」靠这一项变成机器可判——保留标题一出现就报,
 // 连续 ≥ 3 行逐字相同就报行号;两行相同不报(引用一句话不算抄)。
 
 import { test, describe } from 'node:test'
@@ -45,14 +45,19 @@ describe('归一化', () => {
 })
 
 describe('生成器', () => {
-  test('CLI generate 写出 { api, generatedAt, reservedHeadings, lines: { sha1: "file:n" } }', () => {
+  test('CLI generate 写出 { api, reservedHeadings, lines: { sha1: "file:n" } },且只由 rules/ 内容决定', () => {
     const { dir } = rulesFixture()
     const out = join(dir, 'out', '.fingerprint.json')
     const stdout = execFileSync(process.execPath, [GEN, 'generate', '--rules', join(dir, 'plugin-rules'), '--out', out], { encoding: 'utf8' })
     assert.match(stdout, /3 行指纹,6 个保留标题/)
-    const fp = JSON.parse(readFileSync(out, 'utf8'))
+    const first = readFileSync(out, 'utf8')
+    const fp = JSON.parse(first)
     assert.equal(fp.api, FINGERPRINT_API)
-    assert.match(fp.generatedAt, /^\d{4}-\d{2}-\d{2}T/)
+    // 幂等:规则没变,重跑必须写出同一份字节。带时间戳的字段会让每次重跑都产生 diff,
+    // 「生成物只随生成源变」就失效——所以格式里不许有时间戳。
+    execFileSync(process.execPath, [GEN, 'generate', '--rules', join(dir, 'plugin-rules'), '--out', out], { encoding: 'utf8' })
+    assert.equal(readFileSync(out, 'utf8'), first, '重跑生成器产生了不同字节')
+    assert.ok(!('generatedAt' in fp), '指纹不得记生成时间')
     assert.deepEqual(fp.reservedHeadings, DEFAULT_RESERVED_HEADINGS)
     assert.deepEqual(Object.values(fp.lines).sort(), ['plugin-rules/dispatch.md:5', 'plugin-rules/dispatch.md:6', 'plugin-rules/dispatch.md:7'])
     assert.ok(Object.keys(fp.lines).every((k) => /^[0-9a-f]{40}$/.test(k)))

@@ -1,31 +1,31 @@
 ---
 name: spec-steward
-description: 维护项目文档根 `.spec` 的结构并把改动沉淀进知识库——放对位置（插件资产 vs 项目实例）、校验 frontmatter、同步导航与索引、更新状态、文档里落了单的地方写单号。当新增或修改知识文档、决策或项目规则，或完成一处改动后需要沉淀时使用。
+description: 维护项目 `.spec/` 的结构并把改动沉淀进知识库——放对位置（插件资产 vs 项目实例）、校验 frontmatter、同步导航与索引、更新状态、文档里落了单的地方写单号。当新增或修改知识文档、决策或项目规则，或完成一处改动后需要沉淀时使用。
 ---
 
 # spec-steward — 文档管家
 
-保证任何文档结构改动都「放对位置、格式合规、导航与索引同步」，并在开发完成后把「改了什么、为什么」沉淀回项目知识库。本技能**不复述**规矩（通用规矩在插件 `rules/`，项目规矩在项目 `knowledge/README.md` 导航所指的文档），只在改动发生时把规矩**用起来**，并指回对应处。
+保证任何文档结构改动都「放对位置、格式合规、导航与索引同步」，并在开发完成后把「改了什么、为什么」沉淀回项目知识库。本技能**不复述**规矩（通用规矩在插件 `rules/`，项目规矩在项目 `.spec/knowledge/README.md` 导航所指的文档），只在改动发生时把规矩**用起来**，并指回对应处。
 
 **先分清两个归属**——放错位置的代价是能力隐身，或者同一条规矩长出第二份：
 
 | 归属 | 位置 | 特征 |
 |------|------|------|
 | **插件资产** | 插件仓的 `rules/` `skills/` `agents/` `commands/` `templates/` | 「怎么做事」：流程、方法、工具、通用红线；跨项目通用，随插件版本升级 |
-| **项目实例** | 项目文档根 `.spec` 下的 `knowledge/` `decisions/` `AGENTS.md` `rules/system.md` `tools/lint-extensions.mjs` | 「这个项目是什么、定过什么」：架构与设计现状、ADR、项目专属规范与红线、教训、Room 表 |
+| **项目实例** | 项目的 `.spec/knowledge/` `.spec/decisions/` `.spec/AGENTS.md` `.spec/rules/system.md` `.spec/tools/lint-extensions.mjs` | 「这个项目是什么、定过什么」：架构与设计现状、ADR、项目专属规范与红线、教训、Room 表 |
 
 判据：**换一个项目还成立吗？** 成立 → 插件资产；不成立 → 项目实例。**项目不抄插件任何一段**——通用规则由插件每次会话注入，项目里出现插件的保留标题或逐字段落，lint 会报「项目抄插件」。
 
 ## 何时使用
 
 - 新增 / 修改 / 删除一份知识文档、一条 ADR、一条项目专属规则时。
-- 完成一处代码 / 设计改动后，要把它沉淀进 `knowledge/` 时。
-- 不确定某份内容该放哪（插件 rules / 项目 rules / standards / features / decisions）时。
+- 完成一处代码 / 设计改动后，要把它沉淀进 `.spec/knowledge/` 时。
+- 不确定某份内容该放哪（插件 `rules/` / 项目 `.spec/rules/` / `standards/` / `features/` / `decisions/`）时。
 - 文档里要引用一件在途或已派的工作时（写单号，见流程 C）。
 
 ## 前置条件
 
-- 能查阅插件注入的 `rules/`、项目 `knowledge/README.md`（知识导航）与 `decisions/README.md`（决策索引）——本技能指回它们，不重复。
+- 能查阅插件注入的 `rules/`、项目的 `.spec/knowledge/README.md`（知识导航）与 `.spec/decisions/README.md`（决策索引）——本技能指回它们，不重复。
 - 改动目标明确（知道要加 / 改 / 删什么）。
 
 ## 操作步骤
@@ -34,33 +34,33 @@ description: 维护项目文档根 `.spec` 的结构并把改动沉淀进知识�
 
 1. **判类型**——这份内容属于哪一类：
    - 通用的流程 / 方法 / 工具 / 红线（换个项目还成立）→ **插件资产**：向插件仓提需求或 PR，**不在项目里另写一份「临时的」**。
-   - 只属于本项目的硬红线（必须 / 只能 / 不得）→ 项目 `rules/system.md`（无 frontmatter，只放项目专属节）。
-   - 本项目怎么做（流程 / 规范 / 收口命令）→ `knowledge/standards/`。
-   - 某功能的设计现状 → `knowledge/features/<topic>.md`（活文档，文件名不带日期）。
-   - 决策（为什么这样选型 / 划边界 / 调度）→ `decisions/` 新增 ADR（**唯一落点**，见其 `README.md`）。
-   - 复发问题 / 踩坑经验 → `knowledge/lessons.md`。
-   - 跨单的盘点报告与裁决流水 → `reviews/`（某天的记录，文件名带日期前缀）；单卡的审查结论**不进本地**，进 Workflow 的 bug 单与评论。
+   - 只属于本项目的硬红线（必须 / 只能 / 不得）→ 项目 `.spec/rules/system.md`（无 frontmatter，只放项目专属节）。
+   - 本项目怎么做（流程 / 规范 / 收口命令）→ `.spec/knowledge/standards/`。
+   - 某功能的设计现状 → `.spec/knowledge/features/<topic>.md`（活文档，文件名不带日期）。
+   - 决策（为什么这样选型 / 划边界 / 调度）→ `.spec/decisions/` 新增 ADR（**唯一落点**，见其 `README.md`）。
+   - 复发问题 / 踩坑经验 → `.spec/knowledge/lessons.md`。
+   - 跨单的盘点报告与裁决流水 → `.spec/reviews/`（某天的记录，文件名带日期前缀）；单卡的审查结论**不进本地**，进 Workflow 的 bug 单与评论。
 2. **放对位置 + 命名**：kebab、全局唯一；活文档不带日期，记录类带日期前缀。
 3. **写 frontmatter**：
    - knowledge：`name` + `description` + `metadata`（`type` / `status`）
    - rules：**无** frontmatter
-   - ADR：照 `decisions/README.md` 的模板（状态枚举以项目 lint 扩展配置为准）
+   - ADR：照 `.spec/decisions/README.md` 的模板（状态枚举以项目 lint 扩展配置为准）
 4. **同步登记**（漏一处，能力就隐身）：
-   - 加 / 删知识文档 → 更新 `knowledge/README.md` 导航
-   - 加 / 删 ADR → 更新 `decisions/README.md` 索引；ADR 改口了什么文档，就同批改那份文档
-   - 本项目关心的 Room 变了、项目专属技能变了 → 更新项目 `AGENTS.md` 的 Room 表 / 专属技能名册
+   - 加 / 删知识文档 → 更新 `.spec/knowledge/README.md` 导航
+   - 加 / 删 ADR → 更新 `.spec/decisions/README.md` 索引；ADR 改口了什么文档，就同批改那份文档
+   - 本项目关心的 Room 变了、项目专属技能变了 → 更新项目 `.spec/AGENTS.md` 的 Room 表 / 专属技能名册
 
 ### 流程 B · 沉淀知识（改动完成后）
 
 1. 一句话总结：这次改了什么、为什么。
 2. 判断文档归属：
-   - 影响**开发流程 / 规范** → 更新 `knowledge/standards/` 对应文件。
-   - 影响**功能设计**（新功能、行为变更）→ 更新 `knowledge/features/` 对应文档并流转 `status`（feature 文档由 `brainstorming` 在设计期直接建立、「设计中」起步，交付时改「已交付」；确无文档才照项目模板补建）——只写设计现状，不留决策记录。
-   - **决策**（功能内与框架级都算）→ `decisions/` 新增 ADR。
-   - **复发问题 / 踩坑经验**（reviewer 报告或 known gaps 里第二次出现的同类问题）→ 追加进 `knowledge/lessons.md`（收录准入与条目格式见该文档）。
+   - 影响**开发流程 / 规范** → 更新 `.spec/knowledge/standards/` 对应文件。
+   - 影响**功能设计**（新功能、行为变更）→ 更新 `.spec/knowledge/features/` 对应文档并流转 `status`（feature 文档由 `brainstorming` 在设计期直接建立、「设计中」起步，交付时改「已交付」；确无文档才照项目模板补建）——只写设计现状，不留决策记录。
+   - **决策**（功能内与框架级都算）→ `.spec/decisions/` 新增 ADR。
+   - **复发问题 / 踩坑经验**（reviewer 报告或 known gaps 里第二次出现的同类问题）→ 追加进 `.spec/knowledge/lessons.md`（收录准入与条目格式见该文档）。
 3. 更新正文——**只保留当前有效内容**，交付历史不入库（git 提交即历史）。
 4. frontmatter `status` 只取项目 lint 扩展配置的枚举（无配置时：`设计中` / `实施中` / `已交付` / `历史归档`）；`description` 保持一句话（是什么 + 何时查，≤120 字符），**不得**把交付历史写进 description / status。
-5. `knowledge/README.md` 导航行**来源于** frontmatter `description`：同一句话口径，允许排版差异，但不得出现 description 没有的事实——导航行是 Agent 决定「要不要翻开这份文档」的唯一依据，含糊或膨胀都会让判断失准。
+5. `.spec/knowledge/README.md` 导航行**来源于** frontmatter `description`：同一句话口径，允许排版差异，但不得出现 description 没有的事实——导航行是 Agent 决定「要不要翻开这份文档」的唯一依据，含糊或膨胀都会让判断失准。
 6. 待执行的事落 Workflow 单（经 `workflow-planning` 拆单或 `workflow-ops` 单次建单），**别堆进知识库**。
 
 ### 流程 C · 落了单的地方写单号
@@ -75,7 +75,7 @@ description: 维护项目文档根 `.spec` 的结构并把改动沉淀进知识�
 ### 流程 D · 通用机制回填插件
 
 - **准入**：在至少一个真实项目里验证过的**通用机制**（流程 / 方法 / 校验 / 模板 / 红线）。
-- **不收**：项目名词、技术栈绑定、业务规则——这些留在项目自己的 `.spec` 里。
+- **不收**：项目名词、技术栈绑定、业务规则——这些留在项目自己的 `.spec/` 里。
 - 回填 = 向插件仓提需求或 PR；项目侧**不留副本**，等插件发版后删掉临时段落。
 
 ## 快速参考
@@ -83,18 +83,18 @@ description: 维护项目文档根 `.spec` 的结构并把改动沉淀进知识�
 | 内容 | 去处 | frontmatter |
 |------|------|-------------|
 | 通用流程 / 方法 / 红线（换个项目还成立） | 插件仓 | 由插件仓定 |
-| 项目专属红线（必须 / 只能 / 不得） | 项目 `rules/system.md` | 无 |
-| 本项目怎么开发（流程 / 规范） | `knowledge/standards/` | 有 |
-| 某功能的设计现状 | `knowledge/features/` | 有 |
-| 决策（唯一落点） | `decisions/`（ADR） | 照其 README 模板 |
-| 复发问题 / 踩坑经验 | `knowledge/lessons.md` | 有 |
-| 跨单盘点与裁决流水 | `reviews/`（带日期） | 有 |
+| 项目专属红线（必须 / 只能 / 不得） | `.spec/rules/system.md` | 无 |
+| 本项目怎么开发（流程 / 规范） | `.spec/knowledge/standards/` | 有 |
+| 某功能的设计现状 | `.spec/knowledge/features/` | 有 |
+| 决策（唯一落点） | `.spec/decisions/`（ADR） | 照其 README 模板 |
+| 复发问题 / 踩坑经验 | `.spec/knowledge/lessons.md` | 有 |
+| 跨单盘点与裁决流水 | `.spec/reviews/`（带日期） | 有 |
 | 在途 / 待做的工作 | Workflow 单（文档里写单号） | — |
 
 ## 注意事项
 
 - **不抄规矩，只指回它**——同一规则只在一处定义；项目里出现插件的保留标题或逐字段落 = 抄插件，lint 会报。
-- **导航漂移 = 知识隐身**：新增 / 删除文档必须同步 `knowledge/README.md`，否则 Agent 发现不了。
+- **导航漂移 = 知识隐身**：新增 / 删除文档必须同步 `.spec/knowledge/README.md`，否则 Agent 发现不了。
 - **导航行是被按需读取的**：每次会话强制注入的只有插件 `rules/`；项目知识靠入口文件的指针按需下钻，所以导航行必须精简。
 - **rules 管禁止，standards 管怎么做**，别混。
 - **放错归属比放错目录更贵**：项目专属内容混进插件会污染所有下游；通用机制留在项目里则无法复用。
@@ -105,7 +105,7 @@ description: 维护项目文档根 `.spec` 的结构并把改动沉淀进知识�
 
 - [ ] `/workflow:lint`（结构体检，**只报告不阻断**）跑过并读了报告：红是待办，可以带红提交，但**不能把红改成假绿**（删检查项、放宽枚举）——改口只能经 ADR。
 - [ ] 内容在正确目录、命名合规、frontmatter 合规。
-- [ ] `knowledge/README.md` 导航、`decisions/README.md` 索引与实际文件一致。
+- [ ] `.spec/knowledge/README.md` 导航、`.spec/decisions/README.md` 索引与实际文件一致。
 - [ ] knowledge 文档 `status` 与现状一致；正文只含当前有效内容，无历史堆积。
 - [ ] 没有把任何规矩复制进多处；没有抄插件段落。
 - [ ] 文档里引用在途工作的地方都是单号，没有本地任务文件指针、没有状态名。

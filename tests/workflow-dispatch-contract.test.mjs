@@ -93,7 +93,8 @@ describe("workflow-dispatch 边界", () => {
 
   test("合入只守能编过；带红合入不等于改假绿；不等 CI", () => {
     assert.match(skill, /合入只守一条线：能编过/);
-    assert.match(skill, /ADR-087/);
+    assert.match(skill, /测试红是待办不是门/);
+    assert.match(skill, /测试结果不作为合入条件/);
     assert.match(skill, /带红合入不等于可以把红改成假绿/);
     assert.match(skill, /等 CI 转绿」= 违规/);
   });

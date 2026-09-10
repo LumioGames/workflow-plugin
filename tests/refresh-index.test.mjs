@@ -2,7 +2,7 @@
 //
 // 存在的理由：这个脚本跑在会话开始、无人看着，任何一处出错都只能表现为「索引悄悄不对」——
 // 拉了别的项目（回落 current_profile）、把已删的单留着、每次会话都空等超时、两个会话互相
-// 覆盖。下面每条都对应 ADR-088「索引文件」规格的一句话。全部用本地 http 打桩与临时目录。
+// 覆盖。下面每条都对应「索引文件」规格的一句话。全部用本地 http 打桩与临时目录。
 
 import { test, describe, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -77,6 +77,12 @@ const env = () => ({ PATH: process.env.PATH, HOME: home, XDG_CACHE_HOME: cacheHo
 const indexPath = () => cacheIndexPath({ env: env(), home, host: "127.0.0.1" });
 const readIndex = () => JSON.parse(readFileSync(indexPath(), "utf8"));
 
+// 默认预算给得很宽（15 s / 60 s），墙钟不参与任何一条断言的判定：`node --test tests/*.test.mjs`
+// 并行跑多个测试文件时，本进程里的打桩服务器会被挤慢，几百毫秒的紧预算会让全量路径超预算、
+// 落进「离线沿用」分支返回 stale——那是环境噪声，不是被测行为。产品默认值（5 s / 12 s）不动：
+// 那是 SessionStart hook 15 s 超时下的真实取值。要验超时与预算耗尽分支的用例各自显式传小预算。
+const GENEROUS = { requestTimeoutMs: 15_000, totalBudgetMs: 60_000 };
+
 function run(options = {}) {
   const logs = [];
   const result = refreshIndex({
@@ -85,8 +91,7 @@ function run(options = {}) {
     home,
     now: () => NOW,
     log: (line) => logs.push(line),
-    requestTimeoutMs: 300,
-    totalBudgetMs: 1500,
+    ...GENEROUS,
     ...options,
   });
   return result.then((r) => ({ ...r, logs }));
@@ -386,7 +391,8 @@ describe("离线 / 超时（退出码 0，沿用旧快照）", () => {
   test("服务器挂起不回：按单请求超时中止，沿用旧快照", async () => {
     const seeded = seedIndex();
     handler = () => "hang";
-    const r = await run();
+    // 这条专测「单请求超时」分支：只收紧单请求预算，总预算仍宽，确保报的是超时而非预算用尽
+    const r = await run({ requestTimeoutMs: 300 });
     assert.equal(r.status, "stale");
     assert.match(r.logs[0], /请求超时：\/sync\/changes/);
     assert.deepEqual(readIndex().items, seeded.items);
@@ -396,8 +402,9 @@ describe("离线 / 超时（退出码 0，沿用旧快照）", () => {
     seedIndex({ fullPulledAt: iso(NOW - FULL_INTERVAL_MS - 1000) });
     let tick = NOW;
     handler = (url) => (url.pathname === "/api/v1/rooms" ? { body: ROOMS } : { body: { items: [], nextCursor: "" } });
-    // 每次请求把「现在」推进 1 s；总预算 1.5 s → 第二个请求前预算已尽
-    const r = await run({ now: () => (tick += 1000) });
+    // 这条专测「总预算用尽」分支：注入的假时钟每次调用推进 1 s，配 1.5 s 总预算 → 第二个请求前
+    // 预算已尽。判定只看假时钟，不看墙钟，所以并行跑也稳。
+    const r = await run({ now: () => (tick += 1000), totalBudgetMs: 1500 });
     assert.equal(r.status, "stale");
     assert.match(r.logs[0], /总预算用尽/);
     assert.equal(readIndex().fullPulledAt, iso(NOW - FULL_INTERVAL_MS - 1000), "旧快照原样保留");

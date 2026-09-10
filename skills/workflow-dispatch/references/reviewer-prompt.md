@@ -28,7 +28,7 @@ Subagent: reviewer
     - 单号与单正文：<单号> → <BRIEF_FILE>（多张单逐行列）
     - 完整 diff：<DIFF_FILE>（含提交列表、stat、带上下文的 diff；基线 <sha> → HEAD <sha>）
     - 交回物：<单号> → <REPORT_FILE>（逐行列）
-    - 项目规范入口：项目文档根 `.spec` 下 `knowledge/README.md`（按需下钻）
+    - 项目规范入口：`.spec/knowledge/README.md`（按需下钻）
 
     【范围外】<仍在途的并行文件集>——diff 中出现一律不审。
 
