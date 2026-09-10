@@ -54,12 +54,16 @@ describe('基线', () => {
     assert.deepEqual(result.checks.map((c) => c.id), ['core-files', 'fingerprint'])
   })
 
-  test('核心文件:CLAUDE.md 与 AGENTS.md 都没有才报;只有根 AGENTS.md 时 @import 项跳过', async () => {
-    const none = await lint(specFixture({ 'CLAUDE.md': null }))
-    assert.match(messages(none, 'core-files').join('\n'), /缺宿主入口/)
-    const agentsOnly = await lint(specFixture({ 'CLAUDE.md': null, 'AGENTS.md': '# 指针\n' }))
-    assert.equal(agentsOnly.ok, true, formatReport(agentsOnly))
-    assert.equal(status(agentsOnly, 'imports'), 'skipped')
+  test('核心文件:仓根 CLAUDE.md 与 AGENTS.md 缺一即报;无 CLAUDE.md 时 @import 项跳过', async () => {
+    const none = await lint(specFixture({ 'CLAUDE.md': null, 'AGENTS.md': null }))
+    const noneMsgs = messages(none, 'core-files').join('\n')
+    assert.match(noneMsgs, /仓根须有 CLAUDE\.md/)
+    assert.match(noneMsgs, /仓根须有 AGENTS\.md/)
+    const noClaude = await lint(specFixture({ 'CLAUDE.md': null }))
+    assert.match(messages(noClaude, 'core-files').join('\n'), /仓根须有 CLAUDE\.md/)
+    assert.equal(status(noClaude, 'imports'), 'skipped')
+    const noAgents = await lint(specFixture({ 'AGENTS.md': null }))
+    assert.match(messages(noAgents, 'core-files').join('\n'), /仓根须有 AGENTS\.md/)
     const missingNav = await lint(specFixture({ '.spec/knowledge/README.md': null }))
     assert.match(messages(missingNav, 'core-files').join('\n'), /缺核心文件:\.spec\/knowledge\/README\.md/)
     assert.equal(status(missingNav, 'nav-coverage'), 'skipped')

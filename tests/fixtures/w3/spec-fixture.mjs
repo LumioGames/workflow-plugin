@@ -23,6 +23,7 @@ export function writeFiles(root, files) {
 
 export const MINIMAL = {
   'CLAUDE.md': '# CLAUDE.md\n\n@.spec/AGENTS.md\n\n@.spec/knowledge/README.md\n\n@.spec/rules/system.md\n',
+  'AGENTS.md': '# AGENTS.md\n\n@.spec/AGENTS.md\n\n@.spec/knowledge/README.md\n\n@.spec/rules/system.md\n',
   '.spec/AGENTS.md': '# 中心文档\n\n## 项目是什么\n\n测试项目。\n',
   '.spec/rules/system.md': '# 项目专属规则\n',
   '.spec/knowledge/README.md': [

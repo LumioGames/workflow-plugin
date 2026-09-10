@@ -1,5 +1,5 @@
 ---
-description: 在当前项目生成 `.spec/` 骨架与根 CLAUDE.md（只有项目专属那一半；不写 .workflow、不生成 token）
+description: 在当前项目生成 `.spec/` 骨架与根 CLAUDE.md / AGENTS.md（只有项目专属那一半；不写 .workflow、不生成 token）
 argument-hint: "[--force]"
 ---
 
@@ -9,9 +9,9 @@ argument-hint: "[--force]"
 node "${CLAUDE_PLUGIN_ROOT}/tools/init-scaffold.mjs" --target "${CLAUDE_PROJECT_DIR}" $ARGUMENTS
 ```
 
-脚本默认**不覆盖**任何已存在文件（`--force` 才覆盖）；根 `CLAUDE.md` 已存在时只补缺失的 `@import` 行。可以反复跑（升级插件后再跑一次补齐新增模板）。
+脚本默认**不覆盖**任何已存在文件（`--force` 才覆盖）；根 `CLAUDE.md` 已存在时只补缺失的 `@import` 行；根 `AGENTS.md` 已存在则原样跳过。可以反复跑（升级插件后再跑一次补齐新增模板）。
 
-生成的只有「这个项目是什么、定过什么」那一半——`.spec/AGENTS.md`（项目是什么 / Workflow 指针 Room 表 / 收口命令 / 专属技能名册）、`.spec/rules/system.md`（只放项目专属红线的空模板）、`.spec/knowledge/README.md` 与 `.spec/knowledge/features/_TEMPLATE.md`、`.spec/decisions/README.md`、`.spec/tools/lint-extensions.mjs`（lint 扩展样例），以及根 `CLAUDE.md`（`@import` 三件项目专属）。**不生成** `.spec/tasks/`、`.spec/plans/`——任务真值只有 Workflow；**不写** `.workflow`、不生成 token——项目绑定跑 `/workflow:setup`。
+生成的只有「这个项目是什么、定过什么」那一半——`.spec/AGENTS.md`（项目是什么 / Workflow 指针 Room 表 / 收口命令 / 专属技能名册）、`.spec/rules/system.md`（只放项目专属红线的空模板）、`.spec/knowledge/README.md` 与 `.spec/knowledge/features/_TEMPLATE.md`、`.spec/decisions/README.md`、`.spec/tools/lint-extensions.mjs`（lint 扩展样例），以及根 `CLAUDE.md` 与 `AGENTS.md`（薄指针，同一组三行：`.spec/AGENTS.md`、`.spec/knowledge/README.md`、`.spec/rules/system.md`；Claude 靠 `@import` 展开，Codex 须主动 Read）。**不生成** `.spec/tasks/`、`.spec/plans/`——任务真值只有 Workflow；**不写** `.workflow`、不生成 token——项目绑定跑 `/workflow:setup`。
 
 跑完后向用户交代：
 

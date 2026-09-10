@@ -129,7 +129,7 @@ UUID 对验证图谱结果。
 2. **项目扩展** —— 可选的 `.spec/tools/lint-extensions.mjs`，导出 `api = 1` 即被加载（版本对不上会**报错**，不会静默跳过），项目在这里加自己的检查项；
 3. **指纹** —— 项目的 `AGENTS.md` / `rules/` 里出现插件的保留标题、或连续 3 行与插件规则逐字相同，就报「项目抄了插件」。通用规则每次会话注入，抄一份只会让两边慢慢长歪。
 
-**`/workflow:init` —— 生成项目专属的那一半。** 只写「这个项目是什么、定过什么」：`.spec/AGENTS.md`、`.spec/rules/system.md`（项目专属红线的空模板）、`.spec/knowledge/README.md` 与功能文档模板、`.spec/decisions/README.md`、`.spec/tools/lint-extensions.mjs` 样例，以及根 `CLAUDE.md`。默认不覆盖已有文件，可以升级插件后再跑一次补齐新模板。**不写 `.workflow`、不生成 token**——项目绑定走 `/workflow:setup`；也不生成本地任务目录，任务真值只有 Workflow。
+**`/workflow:init` —— 生成项目专属的那一半。** 只写「这个项目是什么、定过什么」：`.spec/AGENTS.md`、`.spec/rules/system.md`（项目专属红线的空模板）、`.spec/knowledge/README.md` 与功能文档模板、`.spec/decisions/README.md`、`.spec/tools/lint-extensions.mjs` 样例，以及根 `CLAUDE.md` 与 `AGENTS.md`（Claude 读前者，Codex 与其它宿主读后者）。默认不覆盖已有文件，可以升级插件后再跑一次补齐新模板。**不写 `.workflow`、不生成 token**——项目绑定走 `/workflow:setup`；也不生成本地任务目录，任务真值只有 Workflow。
 
 CI 里不装插件也能跑同一套体检：
 
