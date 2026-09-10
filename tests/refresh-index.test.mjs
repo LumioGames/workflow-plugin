@@ -90,6 +90,12 @@ const readIndex = () => JSON.parse(readFileSync(indexPath(), "utf8"));
 // 那是 SessionStart hook 15 s 超时下的真实取值。要验超时与预算耗尽分支的用例各自显式传小预算。
 const GENEROUS = { requestTimeoutMs: 15_000, totalBudgetMs: 60_000 };
 
+function makeHome(tag) {
+  const h = join(sandbox, `home-${tag}`);
+  mkdirSync(join(h, ".config/workflow"), { recursive: true });
+  return h;
+}
+
 function run(options = {}) {
   const logs = [];
   const result = refreshIndex({
@@ -494,6 +500,40 @@ describe("TTL 与并发", () => {
     const r = await run();
     assert.equal(r.status, "abandoned");
     assert.deepEqual(readIndex(), otherSession);
+  });
+});
+
+describe("凭据不走明文", () => {
+  // 回归锚点：HTTPS 校验此前只在 marker 分支，env 分支没有——
+  // WORKFLOW_API_BASE=http://<公网域> 会被接受，token 以 Authorization: Bearer 明文上线。
+  // 凭据怎么进来的不改变它该怎么被保护。
+  const resolve = (base) =>
+    resolveCredentials({ env: { WORKFLOW_API_BASE: base, WORKFLOW_TOKEN: "wfp_x" }, cwd: "/tmp", home: "/tmp" });
+
+  test("env 分支：公网 http 被拒，https 通过", () => {
+    const plain = resolve("http://public.example.test/api/v1");
+    assert.equal(plain.ok, false, "明文 http 不得被接受——token 会以 Bearer 明文发出");
+    assert.equal(plain.reason, "bad-base-url");
+    assert.match(plain.warn, /HTTPS/);
+    assert.equal(resolve("https://public.example.test/api/v1").ok, true);
+  });
+
+  test("env 分支：loopback 仍放行（本地打桩要用）", () => {
+    assert.equal(resolve("http://127.0.0.1:4011/api/v1").ok, true);
+    assert.equal(resolve("http://localhost:4011/api/v1").ok, true);
+  });
+
+  test("两个分支的 HTTPS 口径一致", () => {
+    // marker 分支早就有这道检查；两边不一致时，换一种配置方式就能绕过安全边界。
+    const home = makeHome("https-parity");
+    writeFileSync(join(home, ".config/workflow/config.toml"), '[profiles.p]\nbase_url = "http://public.example.test"\ntoken = "wfp_x"\n');
+    const proj = join(home, "proj");
+    mkdirSync(join(proj, ".git"), { recursive: true });
+    writeFileSync(join(proj, ".workflow"), 'profile = "p"\n');
+
+    const viaMarker = resolveCredentials({ env: {}, cwd: proj, home });
+    assert.equal(viaMarker.ok, false, "marker 分支本来就拒明文");
+    assert.equal(viaMarker.reason, resolve("http://public.example.test/api/v1").reason, "两个分支拒绝理由应一致");
   });
 });
 

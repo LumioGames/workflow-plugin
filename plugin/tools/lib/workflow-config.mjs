@@ -85,6 +85,12 @@ export function resolveCredentials({ env = process.env, cwd = process.cwd(), hom
     const baseUrl = normalizeBase(envBase)
     const host = hostOf(baseUrl)
     if (!host) return { ok: false, reason: 'bad-base-url', warn: `WORKFLOW_API_BASE 不是合法 URL` }
+    // HTTPS 校验两个分支必须一致。env 分支此前没有这道检查,于是
+    // WORKFLOW_API_BASE=http://<公网域> 会被接受,token 以 Authorization: Bearer 明文上线。
+    // 凭据怎么进来的不改变它该怎么被保护;loopback 是本地打桩,照旧放行。
+    if (!baseUrl.startsWith('https://') && !LOOPBACK.has(host)) {
+      return { ok: false, reason: 'bad-base-url', warn: `WORKFLOW_API_BASE 不是 HTTPS：不拉索引（token 不走明文）` }
+    }
     return { ok: true, source: 'env', baseUrl, apiBase: baseUrl + API_SUFFIX, token: envToken, host }
   }
 

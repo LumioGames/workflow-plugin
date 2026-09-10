@@ -55,6 +55,13 @@
 - `workflow-ops` 补上 G5 授权例外段。execute / qa / planning 都有，**只有 ops 漏了**——
   它的 description 明写能做状态流转，同文件的 G5 却把状态流转列为停止条件。
 
+### 凭据不走明文
+
+- `resolveCredentials` 的 HTTPS 校验此前只在 `.workflow` marker 分支，**env 分支没有**——
+  `WORKFLOW_API_BASE=http://<公网域>` 会被接受，于是 `Authorization: Bearer wfp_...`
+  以明文 HTTP 上线。两个分支口径已统一；loopback 照旧放行（本地打桩要用）。
+  凭据怎么进来的，不改变它该怎么被保护。
+
 ### 内容错误
 
 - `test-driven-development` 的两段 Good 示例合起来编译不过：回调是同步的（返回 `string`），
