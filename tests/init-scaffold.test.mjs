@@ -1,4 +1,4 @@
-// init-scaffold:生成项目骨架的确定性——只生成项目专属七件、不覆盖、可反复跑、不写 .workflow,生成物过 lint。
+// init-scaffold:生成项目骨架的确定性——只生成项目专属八件、不覆盖、可反复跑、不写 .workflow,生成物过 lint。
 //
 // 存在的理由:init 是用户会反复跑的命令(升级插件后再跑),损毁已有内容的代价远高于少写一个文件;
 // 而骨架本身必须 lint 绿,否则用户第一次跑 /workflow:lint 就红,分不清是自己的问题还是模板的问题。
@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { initScaffold, IMPORT_LINES, WORKFLOW_NOTE } from '../plugin/tools/init-scaffold.mjs'
+import { initScaffold, IMPORT_LINES, CLAUDE_MD, AGENTS_MD, WORKFLOW_NOTE } from '../plugin/tools/init-scaffold.mjs'
 import { runSpecLint, formatReport } from '../plugin/tools/spec-lint/core.mjs'
 import { makeTemp, cleanup, PLUGIN_ROOT } from './fixtures/w3/spec-fixture.mjs'
 
@@ -21,10 +21,11 @@ const EXPECTED = [
   '.spec/rules/system.md',
   '.spec/tools/lint-extensions.mjs',
   'CLAUDE.md',
+  'AGENTS.md',
 ]
 
 describe('生成集合', () => {
-  test('空目录:恰好生成项目专属七件;不生成 tasks / plans / .workflow', () => {
+  test('空目录:恰好生成项目专属八件;不生成 tasks / plans / .workflow', () => {
     const target = makeTemp('init-')
     const r = initScaffold({ pluginRoot: PLUGIN_ROOT, target })
     assert.deepEqual(r.created, EXPECTED)
@@ -34,7 +35,14 @@ describe('生成集合', () => {
       assert.equal(existsSync(join(target, rel)), false, `${rel} 不该生成`)
     }
     const claude = readFileSync(join(target, 'CLAUDE.md'), 'utf8')
+    assert.equal(claude, CLAUDE_MD)
     for (const line of IMPORT_LINES) assert.match(claude, new RegExp(`^${line}$`, 'm'))
+    assert.doesNotMatch(claude, /中心文档|Room 表|知识导航|项目专属红线/)
+    const agents = readFileSync(join(target, 'AGENTS.md'), 'utf8')
+    assert.equal(agents, AGENTS_MD)
+    for (const line of IMPORT_LINES) assert.match(agents, new RegExp(`^${line}$`, 'm'))
+    assert.match(agents, /^Codex 须主动 Read 这三份。$/m)
+    assert.doesNotMatch(agents, /中心文档|Room 表|知识导航|项目专属红线/)
     cleanup(target)
   })
 
@@ -72,6 +80,16 @@ describe('幂等与覆盖', () => {
     cleanup(target)
   })
 
+  test('已有 AGENTS.md 不覆盖、不补行', () => {
+    const target = makeTemp('init-')
+    writeFileSync(join(target, 'AGENTS.md'), '# 用户自己的入口\n')
+    const r = initScaffold({ pluginRoot: PLUGIN_ROOT, target })
+    assert.ok(r.skipped.includes('AGENTS.md'))
+    assert.ok(r.created.includes('CLAUDE.md'))
+    assert.equal(readFileSync(join(target, 'AGENTS.md'), 'utf8'), '# 用户自己的入口\n')
+    cleanup(target)
+  })
+
   test('已有 CLAUDE.md 只补缺失的 @import 行,补一次后不再追加,用户内容原样保留', () => {
     const target = makeTemp('init-')
     writeFileSync(join(target, 'CLAUDE.md'), '# 我的入口\n\n@.spec/AGENTS.md\n\n自己的话。\n')
@@ -103,7 +121,7 @@ describe('生成物过 lint', () => {
   test('CLI:打印生成清单与 .workflow 说明,不写 .workflow', () => {
     const target = makeTemp('init-')
     const stdout = execFileSync(process.execPath, [SCRIPT, '--target', target], { encoding: 'utf8' })
-    assert.match(stdout, /新建 7 个文件/)
+    assert.match(stdout, /新建 8 个文件/)
     assert.ok(stdout.includes(WORKFLOW_NOTE))
     assert.match(stdout, /未生成 tasks\/、plans\//)
     assert.equal(existsSync(join(target, '.workflow')), false)

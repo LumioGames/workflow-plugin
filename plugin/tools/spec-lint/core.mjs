@@ -5,7 +5,7 @@
  * 顺序:通用项(checks/index.mjs 固定顺序)→ 项目扩展(.spec/tools/lint-extensions.mjs)→ 指纹检查,一份报告。
  *
  * 通用项清单(本注释是「通用 lint 能力清单」的单一权威;各项细节见 checks/ 内对应文件头注释):
- *   core-files          仓根 CLAUDE.md 或 AGENTS.md、.spec/AGENTS.md、.spec/knowledge/README.md 存在(缺失可读报错)
+ *   core-files          仓根 CLAUDE.md 与 AGENTS.md、.spec/AGENTS.md、.spec/knowledge/README.md 存在(缺一即报错)
  *   frontmatter         config.frontmatterDirs 下文档的 name / description / metadata.type / metadata.status;
  *                       status ∈ config.statusEnum;description ≤ 120 字单行
  *   nav-coverage        features / standards / knowledge 根 .md 须被 knowledge/README.md 链接

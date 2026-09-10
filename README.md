@@ -129,7 +129,7 @@ UUID 对验证图谱结果。
 2. **项目扩展** —— 可选的 `.spec/tools/lint-extensions.mjs`，导出 `api = 1` 即被加载（版本对不上会**报错**，不会静默跳过），项目在这里加自己的检查项；
 3. **指纹** —— 项目的 `AGENTS.md` / `rules/` 里出现插件的保留标题、或连续 3 行与插件规则逐字相同，就报「项目抄了插件」。通用规则每次会话注入，抄一份只会让两边慢慢长歪。
 
-**`/workflow:init` —— 生成项目专属的那一半。** 只写「这个项目是什么、定过什么」：`.spec/AGENTS.md`、`.spec/rules/system.md`（项目专属红线的空模板）、`.spec/knowledge/README.md` 与功能文档模板、`.spec/decisions/README.md`、`.spec/tools/lint-extensions.mjs` 样例，以及根 `CLAUDE.md`。默认不覆盖已有文件，可以升级插件后再跑一次补齐新模板。**不写 `.workflow`、不生成 token**——项目绑定走 `/workflow:setup`；也不生成本地任务目录，任务真值只有 Workflow。
+**`/workflow:init` —— 每个项目装好插件后必须跑一次。** 只写「这个项目是什么、定过什么」：`.spec/AGENTS.md`、`.spec/rules/system.md`（项目专属红线的空模板）、`.spec/knowledge/README.md` 与功能文档模板、`.spec/decisions/README.md`、`.spec/tools/lint-extensions.mjs` 样例，以及根 `CLAUDE.md` 与 `AGENTS.md` 薄指针（指向上面三份；Claude 读前者，Codex 与其它宿主读后者）。默认不覆盖已有文件，可以升级插件后再跑一次补齐新模板。**不写 `.workflow`、不生成 token**——项目绑定走 `/workflow:setup`；也不生成本地任务目录，任务真值只有 Workflow。
 
 CI 里不装插件也能跑同一套体检：
 
@@ -193,7 +193,9 @@ curl -fsSL https://workflow.games/plugin/install.sh | bash
 
 > 默认 `--mode full`：运行时落到 `$XDG_DATA_HOME/workflow/plugin`（缺 XDG 时 `~/.local/share/workflow/plugin`），`~/.codex/skills/<skill>` 是指向运行时的 symlink。`--mode skills` 仍只装 Markdown + VERSION，并打印能力边界。也可 `--target ~/.claude/skills` 或 `--target .agents/skills`（项目级）。
 
-没有账号也不要紧 —— 装完直接对 Agent 说 **「接入 Workflow」**，`workflow-setup` 一步步带你走完注册、建 token、写配置、验证连接。
+**装好之后，每个项目必须跑一次 `/workflow:init`**（或对 Agent 说「初始化这个项目」/ 跑 `init-scaffold`）。安装只把插件放到机器上；init 才生成仓根 `CLAUDE.md` + `AGENTS.md`，指向 `.spec/AGENTS.md`、`.spec/knowledge/README.md`、`.spec/rules/system.md`。不跑 init，Claude / Codex 没有项目入口。init **不写 token**——项目绑定仍走 `/workflow:setup`。
+
+没有账号也不要紧 —— 对 Agent 说 **「接入 Workflow」**，`workflow-setup` 一步步带你走完注册、建 token、写配置、验证连接。
 
 装好即得十三个命令：`/workflow:setup`、`/workflow:plan <描述>`、`/workflow:bug <描述>`、`/workflow:take <单号>`、`/workflow:qa <单号>`、`/workflow:deps <单号或草稿>`、`/workflow:upload <bundle>`、`/workflow:policy <show|set>`、`/workflow:feedback <描述>`、`/workflow:update`，以及 1.0.0 新增的 `/workflow:init`、`/workflow:lint`、`/workflow:index`。
 
@@ -322,7 +324,7 @@ Agent 只整理你**主动提供**的信息（不扫仓库、不读任何凭证�
 
 ## 一台机器，多个项目
 
-插件全局装一份就够，不必按项目重复安装。
+插件全局装一份就够，不必按项目重复安装。每个仓库仍须跑一次 `/workflow:init`。
 
 ```
 ~/.config/workflow/config.toml     每个项目一节 [profiles.<名>]，各放各的 token
@@ -372,7 +374,8 @@ surfaces = ["web"]
 2. 抓取 files 指向的清单（加同样的 cb 参数），逐个下载清单中的文件并校验 sha256，不符则停止并告诉我；
 3. 跑插件自带的安装器（默认 --mode full）：完整树落到 $XDG_DATA_HOME/workflow/plugin，~/.codex/skills/<skill> 指过去。技能渠道只允许 Markdown 与 VERSION；full 允许清单白名单内的 .mjs。备份不进 skills。旧 files.json 不能当完整运行时；
 4. 列出安装的技能与版本；
-5. 然后直接开始 workflow-setup 技能的接入流程：先检测本机 ~/.config/workflow/config.toml 是否已有可用配置。
+5. 在当前项目跑一次 /workflow:init（或 init-scaffold），生成仓根 CLAUDE.md / AGENTS.md 指针；
+6. 然后直接开始 workflow-setup 技能的接入流程：先检测本机 ~/.config/workflow/config.toml 是否已有可用配置。
 ```
 
 ---
@@ -393,7 +396,7 @@ Workflow Agent 插件是**技能包（skills），不是 MCP server**。插件�
 
 ### 使用这个插件需要先有 Workflow 账号吗？
 
-不需要。装完直接对 Agent 说「接入 Workflow」，`workflow-setup` 技能会引导你完成注册、创建项目 API Token、写入配置、验证连接，并在遇到 401 / 403 时现场分诊。
+不需要。装完先在项目里跑一次 `/workflow:init`，再对 Agent 说「接入 Workflow」，`workflow-setup` 技能会引导你完成注册、创建项目 API Token、写入配置、验证连接，并在遇到 401 / 403 时现场分诊。
 
 ### workflow-qa 是真的去线上点，还是读代码猜结论？
 
@@ -401,7 +404,7 @@ Workflow Agent 插件是**技能包（skills），不是 MCP server**。插件�
 
 ### 一台机器上接多个项目怎么办？
 
-插件全局装一份即可，不必按项目重复安装。`~/.config/workflow/config.toml` 每个项目一节 `[profiles.<名>]` 各放各的 token，项目仓库根放一个 `.workflow` 文件声明绑定哪个 profile。凭证按**环境变量 → `.workflow` 标记 → 全局 `current_profile`** 三级解析，人在哪个目录干活就连哪个项目。
+插件全局装一份即可，不必按项目重复安装；每个仓库仍须跑一次 `/workflow:init`。`~/.config/workflow/config.toml` 每个项目一节 `[profiles.<名>]` 各放各的 token，项目仓库根放一个 `.workflow` 文件声明绑定哪个 profile。凭证按**环境变量 → `.workflow` 标记 → 全局 `current_profile`** 三级解析，人在哪个目录干活就连哪个项目。
 
 ### 多个 Agent 编排干活，执行 Agent 没有 token 怎么办？
 

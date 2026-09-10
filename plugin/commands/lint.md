@@ -9,7 +9,7 @@ argument-hint: "[--strict] [--json]"
 node "${CLAUDE_PLUGIN_ROOT}/bin/spec-lint.mjs" "${CLAUDE_PROJECT_DIR}" $ARGUMENTS
 ```
 
-检查顺序固定、一份报告：通用项（核心文件、frontmatter、导航 / ADR 索引覆盖、链接可达、`@import` 完整、agents / skills frontmatter、软链存活、ADR 撞号与状态行、禁并行文档根）→ 项目扩展（`.spec/tools/lint-extensions.mjs`，可选；`api` 不匹配会报错、不会静默跳过）→ 指纹检查（项目 `AGENTS.md` / `rules/` 出现插件保留标题、或连续 3 行与插件规则逐字相同 = 项目抄了插件）。
+检查顺序固定、一份报告：通用项（核心文件——仓根 `CLAUDE.md` 与 `AGENTS.md` 都必须有、frontmatter、导航 / ADR 索引覆盖、链接可达、`@import` 完整、agents / skills frontmatter、软链存活、ADR 撞号与状态行、禁并行文档根）→ 项目扩展（`.spec/tools/lint-extensions.mjs`，可选；`api` 不匹配会报错、不会静默跳过）→ 指纹检查（项目 `AGENTS.md` / `rules/` 出现插件保留标题、或连续 3 行与插件规则逐字相同 = 项目抄了插件）。
 
 如果当前项目**就是 Workflow 插件仓本身**（仓根 `plugin.json` 的 `name` 为 `workflow`），再跑插件自身的校验与测试：
 

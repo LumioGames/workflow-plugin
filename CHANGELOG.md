@@ -2,6 +2,14 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.5]
+
+仓根宿主入口改为 `CLAUDE.md` 与 `AGENTS.md` 都必须有：Claude 读前者，Codex 与其它宿主读后者。两份都是指向同一组三份项目文件的薄指针。
+
+- `spec-lint` 的 `core-files`：缺任一即报错；不再接受「至少一个」。
+- `/workflow:init` 生成的根 `CLAUDE.md` 只有三行 `@import`；根 `AGENTS.md` 同一组指针并写明「Codex 须主动 Read 这三份」。已存在不覆盖。不抄插件规则。
+- README 写明：每条安装路径之后，每个项目必须跑一次 `/workflow:init`；只装插件没有项目入口。
+
 ## [1.3.4]
 
 完整安装把插件规则以受管 symlink 挂到宿主会扫描的 `.agents/rules/`，不把正文抄进项目。
